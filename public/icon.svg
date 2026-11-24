@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="Deixa que eu Corrijo">
+  <rect width="64" height="64" rx="14" fill="#0B3D2E"/>
+  <path d="M19 12h18l9 9v31a2 2 0 0 1-2 2H19a2 2 0 0 1-2-2V14a2 2 0 0 1 2-2z" fill="#FFFFFF"/>
+  <path d="M37 12v7a2 2 0 0 0 2 2h7z" fill="#D7EFE0"/>
+  <path d="M23.5 35.5l6 6 12-13.5" fill="none" stroke="#1FB36B" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>

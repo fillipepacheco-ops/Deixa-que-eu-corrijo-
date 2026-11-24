@@ -1,0 +1,36 @@
+{
+  "name": "deixa-que-eu-corrijo",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Deixa que eu Corrijo — Menos burocracia. Mais tempo para ensinar.",
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint",
+    "typecheck": "tsc --noEmit",
+    "test": "tsx --test tests/*.test.ts",
+    "samples": "tsx scripts/gerar-amostras.ts"
+  },
+  "dependencies": {
+    "@supabase/ssr": "^0.7.0",
+    "@supabase/supabase-js": "^2.57.0",
+    "lucide-react": "^0.544.0",
+    "next": "^15.5.4",
+    "pdf-lib": "^1.17.1",
+    "react": "^19.1.1",
+    "react-dom": "^19.1.1"
+  },
+  "devDependencies": {
+    "@tailwindcss/postcss": "^4.1.13",
+    "@types/node": "^22.18.0",
+    "@types/react": "^19.1.13",
+    "@types/react-dom": "^19.1.9",
+    "tailwindcss": "^4.1.13",
+    "tsx": "^4.20.5",
+    "typescript": "^5.9.2"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

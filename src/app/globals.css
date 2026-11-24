@@ -1,0 +1,33 @@
+@import "tailwindcss";
+
+/* Identidade visual — Deixa que eu Corrijo */
+@theme {
+  --color-brand-950: #062118;
+  --color-brand-900: #0b3d2e; /* verde escuro */
+  --color-brand-800: #0f4f3b;
+  --color-brand-700: #14684a; /* verde médio */
+  --color-brand-500: #1fb36b; /* verde vivo (destaque) */
+  --color-brand-200: #bfe5cf;
+  --color-brand-100: #d7efe0;
+  --color-brand-50: #eef7f1; /* fundo */
+  --color-ink: #17201c;
+  --color-muted: #5f6b65;
+  --color-line: #dfe7e2;
+
+  --font-sans: var(--font-jakarta), ui-sans-serif, system-ui, sans-serif;
+}
+
+html {
+  color: var(--color-ink);
+  background: #f6faf7;
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* Campos de formulário consistentes */
+.field {
+  @apply w-full rounded-lg border border-line bg-white px-3 py-2.5 text-[15px] outline-none transition
+    placeholder:text-muted/70 focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20;
+}
+.label {
+  @apply mb-1.5 block text-[13px] font-semibold text-brand-900;
+}

@@ -1,0 +1,402 @@
+/**
+ * GERADOR PROFISSIONAL DE PDF DA PROVA (A4).
+ *
+ * - 4 modelos: escolar, simulado, larga escala e personalizado;
+ * - numeração automática, cabeçalho, rodapé e paginação "Página X de Y";
+ * - cada questão é um bloco indivisível: se não couber, vai inteira para a
+ *   próxima coluna/página (imagem e tabela ficam junto do enunciado);
+ * - só quebra uma questão se ela sozinha for maior que uma coluna inteira.
+ */
+import { PDFDocument, StandardFonts, rgb, type PDFImage, type PDFPage } from "pdf-lib";
+import type { Assessment, AssessmentQuestion, PdfTemplate } from "@/lib/models/types";
+import { A4, BRAND, drawTextTop, formatDateBR, mm, sanitize, wrapText } from "./common";
+
+export interface TemplateConfig {
+  columns: 1 | 2;
+  fontSize: number;
+  header: "full" | "compact" | "band";
+  showGradeBox: boolean;
+  showSignature: boolean;
+  questionHeading: "inline" | "boxed";
+  showWeights: boolean;
+  essayLines: number;
+}
+
+export const TEMPLATES: Record<Exclude<PdfTemplate, "personalizado">, TemplateConfig> = {
+  escolar: {
+    columns: 1, fontSize: 11, header: "full", showGradeBox: true, showSignature: true,
+    questionHeading: "inline", showWeights: true, essayLines: 6,
+  },
+  simulado: {
+    columns: 2, fontSize: 9.5, header: "compact", showGradeBox: true, showSignature: false,
+    questionHeading: "inline", showWeights: false, essayLines: 5,
+  },
+  larga_escala: {
+    columns: 2, fontSize: 9.5, header: "band", showGradeBox: false, showSignature: false,
+    questionHeading: "boxed", showWeights: false, essayLines: 5,
+  },
+};
+
+export const TEMPLATE_NAMES: Record<PdfTemplate, string> = {
+  escolar: "Modelo 1 — Avaliação Escolar",
+  simulado: "Modelo 2 — Simulado",
+  larga_escala: "Modelo 3 — Avaliação de larga escala",
+  personalizado: "Modelo 4 — Personalizado",
+};
+
+export function resolveTemplate(template: PdfTemplate, custom?: Partial<TemplateConfig>): TemplateConfig {
+  if (template === "personalizado") return { ...TEMPLATES.escolar, ...custom };
+  return TEMPLATES[template];
+}
+
+const MARGIN_X = mm(18);
+const MARGIN_TOP = mm(14);
+const MARGIN_BOTTOM = mm(18);
+const COLUMN_GAP = mm(8);
+
+interface Piece {
+  h: number;
+  draw: (page: PDFPage, x: number, top: number) => void;
+}
+
+export interface AssessmentPdfInput {
+  assessment: Assessment;
+  questions: AssessmentQuestion[];
+  customTemplate?: Partial<TemplateConfig>;
+}
+
+export interface AssessmentPdfResult {
+  bytes: Uint8Array;
+  pageCount: number;
+  /** Página em que cada questão começa (útil para testes e revisão). */
+  questionPages: Record<number, number>;
+}
+
+export async function generateAssessmentPdf(input: AssessmentPdfInput): Promise<AssessmentPdfResult> {
+  const { assessment } = input;
+  const cfg = resolveTemplate(assessment.template, input.customTemplate);
+  const questions = [...input.questions].sort((a, b) => a.position - b.position);
+
+  const doc = await PDFDocument.create();
+  doc.setTitle(assessment.title);
+  doc.setCreator("Deixa que eu Corrijo");
+  const regular = await doc.embedFont(StandardFonts.Helvetica);
+  const bold = await doc.embedFont(StandardFonts.HelveticaBold);
+  const italic = await doc.embedFont(StandardFonts.HelveticaOblique);
+
+  const fs = cfg.fontSize;
+  const lh = fs * 1.38;
+  const contentW = A4.w - 2 * MARGIN_X;
+  const colW = cfg.columns === 2 ? (contentW - COLUMN_GAP) / 2 : contentW;
+
+  // ---------- imagens (embutidas uma vez) ----------
+  const images = new Map<number, PDFImage>();
+  for (const q of questions) {
+    if (!q.image) continue;
+    images.set(q.position, q.image.kind === "png" ? await doc.embedPng(q.image.bytes) : await doc.embedJpg(q.image.bytes));
+  }
+
+  // ---------- montagem das peças de cada questão ----------
+  const groups: { number: number; pieces: Piece[] }[] = questions.map((q, idx) => {
+    const number = idx + 1; // numeração automática
+    const pieces: Piece[] = [];
+    const indent = cfg.questionHeading === "inline" ? fs * 1.9 : 0;
+    const textW = colW - indent;
+
+    // Título da questão (modelo larga escala).
+    if (cfg.questionHeading === "boxed") {
+      const label = `QUESTÃO ${String(number).padStart(2, "0")}`;
+      pieces.push({
+        h: fs * 1.9,
+        draw: (page, x, top) => {
+          const w = bold.widthOfTextAtSize(label, fs * 0.9) + 10;
+          page.drawRectangle({ x, y: A4.h - top - fs * 1.45, width: w, height: fs * 1.45, color: BRAND.dark });
+          drawTextTop(page, label, { x: x + 5, top: top + fs * 0.25, size: fs * 0.9, font: bold, color: BRAND.white });
+          if (cfg.showWeights) {
+            drawTextTop(page, pointsLabel(q.weight), { x: x + w + 6, top: top + fs * 0.25, size: fs * 0.8, font: italic, color: BRAND.gray });
+          }
+        },
+      });
+    }
+
+    // Valor da questão (modelo escolar), discreto e alinhado à direita.
+    if (cfg.questionHeading === "inline" && cfg.showWeights && q.weight !== 1) {
+      const t = pointsLabel(q.weight);
+      pieces.push({
+        h: fs * 1.05,
+        draw: (page, x, top) => {
+          const w = italic.widthOfTextAtSize(t, fs * 0.75);
+          drawTextTop(page, t, { x: x + colW - w, top, size: fs * 0.75, font: italic, color: BRAND.gray });
+        },
+      });
+    }
+
+    // Enunciado.
+    const statement = q.statement?.trim() || "(enunciado não preenchido)";
+    const stLines = wrapText(regular, fs, statement, textW);
+    stLines.forEach((line, i) => {
+      pieces.push({
+        h: lh,
+        draw: (page, x, top) => {
+          if (i === 0 && cfg.questionHeading === "inline") {
+            drawTextTop(page, `${number}.`, { x, top, size: fs, font: bold, color: BRAND.dark });
+          }
+          drawTextTop(page, line, { x: x + indent, top, size: fs, font: regular });
+        },
+      });
+    });
+
+    // Imagem logo abaixo do enunciado.
+    const img = images.get(q.position);
+    if (img) {
+      const maxW = Math.min(textW, q.image?.widthMm ? mm(q.image.widthMm) : textW);
+      const maxH = mm(90);
+      const scale = Math.min(maxW / img.width, maxH / img.height, 1.5);
+      const w = img.width * scale;
+      const h = img.height * scale;
+      pieces.push({
+        h: h + lh * 0.6,
+        draw: (page, x, top) => {
+          page.drawImage(img, { x: x + indent + (textW - w) / 2, y: A4.h - top - lh * 0.3 - h, width: w, height: h });
+        },
+      });
+    }
+
+    // Tabela simples.
+    if (q.table_data?.rows?.length) {
+      const rows = q.table_data.rows;
+      const ncols = Math.max(...rows.map((r) => r.length));
+      const cellW = textW / ncols;
+      const tfs = fs * 0.9;
+      const tlh = tfs * 1.3;
+      const rowHeights = rows.map((r) =>
+        Math.max(...Array.from({ length: ncols }, (_, c) => wrapText(regular, tfs, r[c] ?? "", cellW - 6).length)) * tlh + 4,
+      );
+      const total = rowHeights.reduce((a, b) => a + b, 0);
+      pieces.push({
+        h: total + lh * 0.6,
+        draw: (page, x0, top0) => {
+          let top = top0 + lh * 0.3;
+          rows.forEach((r, ri) => {
+            const rh = rowHeights[ri];
+            for (let c = 0; c < ncols; c++) {
+              const cx = x0 + indent + c * cellW;
+              page.drawRectangle({
+                x: cx, y: A4.h - top - rh, width: cellW, height: rh,
+                borderColor: BRAND.line, borderWidth: 0.6,
+                color: ri === 0 ? BRAND.light : undefined,
+              });
+              wrapText(regular, tfs, r[c] ?? "", cellW - 6).forEach((line, li) => {
+                drawTextTop(page, line, { x: cx + 3, top: top + 2 + li * tlh, size: tfs, font: ri === 0 ? bold : regular });
+              });
+            }
+            top += rh;
+          });
+        },
+      });
+    }
+
+    // Alternativas / espaço de resposta.
+    pieces.push({ h: lh * 0.25, draw: () => {} });
+    if (q.type === "multiple_choice") {
+      const optIndent = fs * 2.2;
+      for (const opt of q.options) {
+        const lines = wrapText(regular, fs, opt.text, textW - optIndent);
+        lines.forEach((line, i) => {
+          pieces.push({
+            h: lh,
+            draw: (page, x, top) => {
+              if (i === 0) drawTextTop(page, `(${opt.label})`, { x: x + indent, top, size: fs, font: bold, color: BRAND.mid });
+              drawTextTop(page, line, { x: x + indent + optIndent, top, size: fs, font: regular });
+            },
+          });
+        });
+      }
+    } else if (q.type === "true_false") {
+      pieces.push({
+        h: lh * 1.2,
+        draw: (page, x, top) => {
+          drawTextTop(page, "(     ) Verdadeiro          (     ) Falso", { x: x + indent, top: top + 2, size: fs, font: regular });
+        },
+      });
+    } else {
+      const n = q.type === "short_answer" ? 2 : cfg.essayLines;
+      const gap = Math.max(lh * 1.35, mm(7));
+      pieces.push({
+        h: n * gap + 4,
+        draw: (page, x, top) => {
+          for (let i = 1; i <= n; i++) {
+            const y = A4.h - top - i * gap;
+            page.drawLine({ start: { x: x + indent, y }, end: { x: x + colW, y }, thickness: 0.5, color: BRAND.line });
+          }
+        },
+      });
+    }
+    pieces.push({ h: lh * 0.9, draw: () => {} }); // respiro entre questões
+    return { number, pieces };
+  });
+
+  // ---------- páginas, cabeçalho e fluxo ----------
+  const pages: PDFPage[] = [];
+  let page!: PDFPage;
+  let col = 0;
+  let cursor = 0;
+  let areaTop = 0;
+  const areaBottom = A4.h - MARGIN_BOTTOM - mm(6);
+
+  const newPage = () => {
+    page = doc.addPage([A4.w, A4.h]);
+    pages.push(page);
+    col = 0;
+    areaTop = pages.length === 1 ? drawFirstHeader(page) : drawRunningHeader(page);
+    cursor = areaTop;
+    if (cfg.columns === 2) {
+      const x = MARGIN_X + colW + COLUMN_GAP / 2;
+      page.drawLine({ start: { x, y: A4.h - areaTop }, end: { x, y: A4.h - areaBottom }, thickness: 0.5, color: BRAND.line });
+    }
+  };
+  const nextColumn = () => {
+    if (col < cfg.columns - 1) {
+      col++;
+      cursor = areaTop;
+    } else newPage();
+  };
+  const colX = () => MARGIN_X + col * (colW + COLUMN_GAP);
+
+  function drawFirstHeader(p: PDFPage): number {
+    let top = MARGIN_TOP;
+    const a = assessment;
+
+    if (cfg.header === "band") {
+      const bandH = mm(17);
+      p.drawRectangle({ x: MARGIN_X, y: A4.h - top - bandH, width: contentW, height: bandH, color: BRAND.dark });
+      drawTextTop(p, (a.school_name ?? "").toUpperCase(), { x: MARGIN_X + mm(4), top: top + mm(2.5), size: 8, font: bold, color: rgb(0.75, 0.9, 0.82) });
+      // Disciplina/série na mesma linha da escola; título ocupa a largura toda.
+      const sub = [a.subject, a.grade_level].filter(Boolean).join("  ·  ").toUpperCase();
+      const sw = bold.widthOfTextAtSize(sanitize(bold, sub), 8);
+      drawTextTop(p, sub, { x: MARGIN_X + contentW - mm(4) - sw, top: top + mm(2.5), size: 8, font: bold, color: rgb(0.75, 0.9, 0.82) });
+      const title = sanitize(bold, a.title);
+      let ts = 14;
+      while (ts > 10 && bold.widthOfTextAtSize(title, ts) > contentW - mm(8)) ts -= 0.5;
+      const shown = bold.widthOfTextAtSize(title, ts) > contentW - mm(8) ? wrapText(bold, ts, title, contentW - mm(8))[0] + "..." : title;
+      drawTextTop(p, shown, { x: MARGIN_X + mm(4), top: top + mm(7.5), size: ts, font: bold, color: BRAND.white });
+      top += bandH + mm(3);
+    } else {
+      if (a.school_name) {
+        drawTextTop(p, a.school_name.toUpperCase(), { x: MARGIN_X, top, size: 8.5, font: bold, color: BRAND.mid });
+        top += 12;
+      }
+      const titleSize = cfg.header === "full" ? 15 : 13;
+      wrapText(bold, titleSize, a.title, contentW - (cfg.showGradeBox ? mm(32) : 0)).forEach((line) => {
+        drawTextTop(p, line, { x: MARGIN_X, top, size: titleSize, font: bold, color: BRAND.dark });
+        top += titleSize * 1.25;
+      });
+      top += 4;
+    }
+
+    // Campos: aluno, nº, turma, disciplina, professor, data (+ nota).
+    const gradeW = cfg.showGradeBox ? mm(28) : 0;
+    const fieldsW = contentW - (gradeW ? gradeW + mm(4) : 0);
+    const rowH = mm(9.5);
+    const startTop = top;
+    const field = (label: string, value: string, x: number, t: number, w: number) => {
+      p.drawRectangle({ x, y: A4.h - t - rowH, width: w, height: rowH, borderColor: BRAND.line, borderWidth: 0.6 });
+      drawTextTop(p, label.toUpperCase(), { x: x + 4, top: t + 2.5, size: 6, font: bold, color: BRAND.mid });
+      if (value) drawTextTop(p, value, { x: x + 4, top: t + 11, size: 9.5, font: regular });
+    };
+    const x0 = MARGIN_X;
+    field("Aluno(a)", "", x0, top, fieldsW - mm(18));
+    field("Nº", "", x0 + fieldsW - mm(18), top, mm(18));
+    top += rowH;
+    const w4 = fieldsW / 4;
+    field("Turma", assessment.class_name ?? "", x0, top, w4);
+    field("Disciplina", assessment.subject ?? "", x0 + w4, top, w4);
+    field("Professor(a)", assessment.teacher_name ?? "", x0 + 2 * w4, top, w4);
+    field("Data", formatDateBR(assessment.applied_on), x0 + 3 * w4, top, w4);
+    top += rowH;
+
+    if (cfg.showGradeBox) {
+      const gx = MARGIN_X + contentW - gradeW;
+      const gh = top - startTop;
+      p.drawRectangle({ x: gx, y: A4.h - startTop - gh, width: gradeW, height: gh, borderColor: BRAND.dark, borderWidth: 1 });
+      p.drawRectangle({ x: gx, y: A4.h - startTop - mm(5), width: gradeW, height: mm(5), color: BRAND.dark });
+      const t = "NOTA";
+      drawTextTop(p, t, { x: gx + (gradeW - bold.widthOfTextAtSize(t, 7)) / 2, top: startTop + 4, size: 7, font: bold, color: BRAND.white });
+      const max = `/ ${assessment.max_score.toLocaleString("pt-BR")}`;
+      drawTextTop(p, max, { x: gx + gradeW - regular.widthOfTextAtSize(max, 7) - 4, top: startTop + gh - 11, size: 7, font: regular, color: BRAND.gray });
+    }
+
+    if (cfg.showSignature) {
+      top += mm(7);
+      const sw = mm(80);
+      p.drawLine({ start: { x: MARGIN_X + contentW - sw, y: A4.h - top }, end: { x: MARGIN_X + contentW, y: A4.h - top }, thickness: 0.6, color: BRAND.ink });
+      drawTextTop(p, "Assinatura do(a) responsável", { x: MARGIN_X + contentW - sw, top: top + 2, size: 7, font: regular, color: BRAND.gray });
+      top += mm(5);
+    }
+
+    // Instruções.
+    if (assessment.instructions?.trim()) {
+      top += mm(3);
+      const ifs = fs * 0.88;
+      const lines = wrapText(regular, ifs, assessment.instructions.trim(), contentW - mm(8));
+      const boxH = lines.length * ifs * 1.35 + mm(9);
+      p.drawRectangle({ x: MARGIN_X, y: A4.h - top - boxH, width: contentW, height: boxH, color: BRAND.light });
+      p.drawRectangle({ x: MARGIN_X, y: A4.h - top - boxH, width: 2.5, height: boxH, color: BRAND.vivid });
+      drawTextTop(p, "INSTRUÇÕES", { x: MARGIN_X + mm(4), top: top + mm(2.5), size: 7, font: bold, color: BRAND.mid });
+      lines.forEach((line, i) => {
+        drawTextTop(p, line, { x: MARGIN_X + mm(4), top: top + mm(6.5) + i * ifs * 1.35, size: ifs, font: regular });
+      });
+      top += boxH;
+    }
+    return top + mm(5);
+  }
+
+  function drawRunningHeader(p: PDFPage): number {
+    const top = MARGIN_TOP;
+    const title = sanitize(regular, assessment.title);
+    drawTextTop(p, title.length > 70 ? title.slice(0, 67) + "..." : title, { x: MARGIN_X, top, size: 8, font: bold, color: BRAND.mid });
+    const name = "Aluno(a): ______________________________";
+    drawTextTop(p, name, { x: MARGIN_X + contentW - regular.widthOfTextAtSize(name, 8), top, size: 8, font: regular, color: BRAND.gray });
+    p.drawLine({ start: { x: MARGIN_X, y: A4.h - top - 13 }, end: { x: MARGIN_X + contentW, y: A4.h - top - 13 }, thickness: 0.6, color: BRAND.line });
+    return top + 22;
+  }
+
+  newPage();
+  const questionPages: Record<number, number> = {};
+
+  for (const g of groups) {
+    const total = g.pieces.reduce((s, p) => s + p.h, 0);
+    // Respiro final não precisa caber.
+    const needed = total - g.pieces[g.pieces.length - 1].h;
+    // Questão inteira não cabe no espaço restante: vai inteira para a próxima coluna/página.
+    if (cursor + needed > areaBottom && cursor > areaTop) nextColumn();
+    questionPages[g.number] = pages.length;
+    for (const piece of g.pieces) {
+      if (cursor + piece.h > areaBottom && cursor > areaTop && piece.h > 0) {
+        // Só acontece se a questão for maior que uma coluna inteira.
+        nextColumn();
+      }
+      piece.draw(page, colX(), cursor);
+      cursor += piece.h;
+    }
+  }
+
+  // ---------- rodapé com paginação ----------
+  const n = pages.length;
+  pages.forEach((p, i) => {
+    const y = MARGIN_BOTTOM - mm(8);
+    p.drawLine({ start: { x: MARGIN_X, y: y + 12 }, end: { x: MARGIN_X + contentW, y: y + 12 }, thickness: 0.5, color: BRAND.line });
+    const left = sanitize(regular, [assessment.subject, assessment.title].filter(Boolean).join(" — "));
+    p.drawText(left.length > 80 ? left.slice(0, 77) + "..." : left, { x: MARGIN_X, y, size: 7, font: regular, color: BRAND.gray });
+    const right = `Página ${i + 1} de ${n}`;
+    p.drawText(right, { x: MARGIN_X + contentW - bold.widthOfTextAtSize(right, 7.5), y, size: 7.5, font: bold, color: BRAND.mid });
+  });
+
+  const bytes = await doc.save();
+  return { bytes, pageCount: n, questionPages };
+}
+
+function pointsLabel(weight: number): string {
+  const v = weight.toLocaleString("pt-BR", { maximumFractionDigits: 2 });
+  return `(${v} ${weight === 1 ? "ponto" : "pontos"})`;
+}
