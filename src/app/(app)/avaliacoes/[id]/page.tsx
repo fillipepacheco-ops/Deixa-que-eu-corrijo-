@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { ArrowLeft, Eye, FileDown, FileText, Plus, ScanLine, Trash2, Users } from "lucide-react";
+import { ArrowLeft, Eye, Plus, Trash2 } from "lucide-react";
 import { buttonClass } from "@/components/ui/button";
 import { createClient } from "@/lib/supabase/server";
 import { loadAssessment, loadStudents, questionImageUrls, schoolLogoUrl } from "@/services/assessment-data";
@@ -19,7 +19,7 @@ import { ActionForm } from "@/components/ui/ActionForm";
 import { ConfirmButton } from "@/components/ui/ConfirmButton";
 import { HeaderFields } from "@/components/assessments/HeaderFields";
 import { QuestionEditor } from "@/components/assessments/QuestionEditor";
-import { FileButton } from "@/components/assessments/FileButton";
+import { PrintPanel } from "@/components/assessments/PrintPanel";
 import { fileSlug, formatDateBR } from "@/lib/assessment/header";
 import { QUESTION_TYPE_NAMES } from "@/lib/assessment/question-form";
 import type { QuestionType } from "@/lib/models/types";
@@ -43,7 +43,6 @@ export default async function AvaliacaoPage({ params }: { params: Promise<{ id: 
   ]);
 
   const objective = questions.filter((q) => q.type === "multiple_choice" || q.type === "true_false");
-  const noQuestions = questions.length === 0 ? "Adicione questões primeiro" : undefined;
   const slug = fileSlug(assessment.title);
 
   return (
@@ -64,45 +63,15 @@ export default async function AvaliacaoPage({ params }: { params: Promise<{ id: 
           .join(" · ")}
       />
 
-      {/* Arquivos gerados a partir da mesma informação */}
-      <section className="mb-7 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-        <FileButton
-          href={`/api/avaliacoes/${id}/pdf?modo=alunos`}
-          filename={`${slug}-por-aluno.pdf`}
-          mime="application/pdf"
-          icon={<Users size={24} />}
-          title="Provas por aluno (PDF)"
-          subtitle={`${students.length} provas com nome e nº na capa`}
-          disabled={noQuestions ?? (students.length === 0 ? "Escolha uma turma com alunos" : undefined)}
-        />
-        <FileButton
-          href={`/api/avaliacoes/${id}/pdf?modo=branco`}
-          filename={`${slug}.pdf`}
-          mime="application/pdf"
-          icon={<FileDown size={24} />}
-          title="Prova em branco (PDF)"
-          subtitle="Nome do aluno em branco"
-          disabled={noQuestions}
-        />
-        <FileButton
-          href={`/api/avaliacoes/${id}/docx`}
-          filename={`${slug}.docx`}
-          mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-          icon={<FileText size={24} />}
-          title="Prova no Word"
-          subtitle="Arquivo editável (.docx)"
-          disabled={noQuestions}
-        />
-        <FileButton
-          href={`/api/avaliacoes/${id}/cartoes`}
-          filename={`cartoes-${slug}.pdf`}
-          mime="application/pdf"
-          icon={<ScanLine size={24} />}
-          title="Cartões-resposta"
-          subtitle={assessment.class_name ? `Um por aluno da ${assessment.class_name}` : "Cartões em branco"}
-          disabled={objective.length === 0 ? "Precisa de questão objetiva" : undefined}
-        />
-      </section>
+      {/* Impressão: turma toda ou um aluno (prova, cartão ou os dois juntos) */}
+      <PrintPanel
+        assessmentId={id}
+        slug={slug}
+        students={students}
+        className={assessment.class_name ?? null}
+        hasQuestions={questions.length > 0}
+        hasObjective={objective.length > 0}
+      />
 
       <div className="grid gap-6 xl:grid-cols-[1fr_300px]">
         <section>
