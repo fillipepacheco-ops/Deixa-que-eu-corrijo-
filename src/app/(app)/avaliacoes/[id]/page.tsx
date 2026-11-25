@@ -1,7 +1,8 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { ArrowLeft, FileDown, FileText, Plus, ScanLine, Trash2, Users } from "lucide-react";
+import { ArrowLeft, Eye, FileDown, FileText, Plus, ScanLine, Trash2, Users } from "lucide-react";
+import { buttonClass } from "@/components/ui/button";
 import { createClient } from "@/lib/supabase/server";
 import { loadAssessment, loadStudents, schoolLogoUrl } from "@/services/assessment-data";
 import {
@@ -52,6 +53,11 @@ export default async function AvaliacaoPage({ params }: { params: Promise<{ id: 
       <PageHeader
         eyebrow="Larga escala · 2 colunas · Arial 12 · justificado · espaçamento 1,5"
         title={assessment.title}
+        actions={
+          <Link href={`/avaliacoes/${id}/ver`} className={buttonClass()}>
+            <Eye size={18} /> Ver prova
+          </Link>
+        }
         description={[assessment.subject, assessment.class_name, formatDateBR(assessment.applied_on), `${questions.length} ${questions.length === 1 ? "questão" : "questões"}`]
           .filter(Boolean)
           .join(" · ")}

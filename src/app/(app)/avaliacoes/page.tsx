@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { ChevronRight, FilePlus2 } from "lucide-react";
+import { Eye, FilePlus2, Pencil } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { Card, EmptyState, PageHeader } from "@/components/ui/PageHeader";
 import { buttonClass } from "@/components/ui/button";
@@ -43,18 +43,25 @@ export default async function AvaliacoesPage() {
             const n = (a.assessment_questions as unknown as { count: number }[])?.[0]?.count ?? 0;
             const turma = (a.classes as unknown as { name: string } | null)?.name;
             return (
-              <Link key={a.id} href={`/avaliacoes/${a.id}`} className="flex items-center gap-4 px-5 py-4 transition hover:bg-brand-50/60 active:bg-brand-50">
-                <span className="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-brand-50 text-brand-700">
-                  <FilePlus2 size={20} />
-                </span>
-                <span className="min-w-0 flex-1">
-                  <span className="block truncate font-bold text-brand-900">{a.title}</span>
-                  <span className="block truncate text-[13px] text-muted">
-                    {[a.subject, turma, formatDateBR(a.applied_on), `${n} ${n === 1 ? "questão" : "questões"}`].filter(Boolean).join(" · ")}
+              <div key={a.id} className="flex items-center gap-2 pr-3 sm:pr-4">
+                <Link href={`/avaliacoes/${a.id}`} className="flex min-w-0 flex-1 items-center gap-4 px-5 py-4 transition hover:bg-brand-50/60 active:bg-brand-50">
+                  <span className="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-brand-50 text-brand-700">
+                    <FilePlus2 size={20} />
                   </span>
-                </span>
-                <ChevronRight size={18} className="text-muted" />
-              </Link>
+                  <span className="min-w-0 flex-1">
+                    <span className="block truncate font-bold text-brand-900">{a.title}</span>
+                    <span className="block truncate text-[13px] text-muted">
+                      {[a.subject, turma, formatDateBR(a.applied_on), `${n} ${n === 1 ? "questão" : "questões"}`].filter(Boolean).join(" · ")}
+                    </span>
+                  </span>
+                </Link>
+                <Link href={`/avaliacoes/${a.id}/ver`} className={`${buttonClass("secondary")} shrink-0 px-3!`} aria-label="Ver prova">
+                  <Eye size={17} /> <span className="hidden sm:inline">Ver prova</span>
+                </Link>
+                <Link href={`/avaliacoes/${a.id}`} className={`${buttonClass("ghost")} shrink-0 px-3!`} aria-label="Editar prova">
+                  <Pencil size={17} /> <span className="hidden sm:inline">Editar</span>
+                </Link>
+              </div>
             );
           })}
         </Card>

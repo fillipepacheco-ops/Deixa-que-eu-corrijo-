@@ -9,7 +9,7 @@
  */
 import { CODE_TOTAL_BITS } from "./code";
 
-export const LAYOUT_VERSION = 1;
+export const LAYOUT_VERSION = 2; // v2: bolhas menores (3,3 mm)
 export const PAGE_W = 210;
 export const PAGE_H = 297;
 
@@ -25,9 +25,9 @@ export const FIDUCIALS: ReadonlyArray<{ x: number; y: number }> = [
 export const MAX_QUESTIONS = 80;
 export const MAX_OPTIONS = 5;
 const ROWS_PER_COLUMN = 20;
-const ROW_PITCH = 8; // mm entre linhas
-const OPTION_PITCH = 7; // mm entre bolhas
-const BUBBLE_R = 2.3; // raio da bolha
+const ROW_PITCH = 6.5; // mm entre linhas
+const OPTION_PITCH = 5.5; // mm entre bolhas
+const BUBBLE_R = 1.65; // raio da bolha (3,3 mm de diâmetro, tamanho usual de cartão)
 const GRID_TOP = 112; // y do centro da 1ª linha
 const GRID_LEFT = 24; // x do centro do número da 1ª coluna
 const COLUMN_PITCH = 45;
@@ -103,7 +103,7 @@ export function rollGridLayout(): RollBubble[] {
   const top = 58;
   for (const d of [0, 1] as const) {
     for (let v = 0; v <= 9; v++) {
-      out.push({ digit: d, value: v, x: left + d * 7 + 7, y: top + v * 4.6, r: 1.8 });
+      out.push({ digit: d, value: v, x: left + d * 6 + 7, y: top + v * 4.2, r: 1.5 });
     }
   }
   return out;

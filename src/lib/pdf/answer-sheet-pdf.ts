@@ -127,7 +127,7 @@ export async function generateAnswerSheetsPdf(input: AnswerSheetInput): Promise<
       x: mm(17), top: mm(91.5), size: 7, font: regular, color: BRAND.ink,
     });
     // Exemplo de marcação correta.
-    page.drawCircle({ x: mm(146), y: toY(91), size: mm(2.3), color: BRAND.black });
+    page.drawCircle({ x: mm(146), y: toY(91), size: mm(1.65), color: BRAND.black });
     drawTextTop(page, "certo", { x: mm(138.5), top: mm(94.5), size: 6, font: regular, color: BRAND.gray });
 
     // Grade de respostas.
@@ -144,8 +144,8 @@ export async function generateAnswerSheetsPdf(input: AnswerSheetInput): Promise<
       page.drawCircle({ x: toX(b.x), y: toY(b.y), size: mm(b.r), borderColor: BRAND.ink, borderWidth: 0.8 });
       // Certo/errado: a letra fica dentro (as colunas A–E não se aplicam).
       if (b.inner) {
-        const w = regular.widthOfTextAtSize(b.label, 6);
-        drawTextTop(page, b.label, { x: toX(b.x) - w / 2, top: mm(b.y) - 2.4, size: 6, font: regular, color: rgb(0.7, 0.72, 0.71) });
+        const w = regular.widthOfTextAtSize(b.label, 5);
+        drawTextTop(page, b.label, { x: toX(b.x) - w / 2, top: mm(b.y) - 2, size: 5, font: regular, color: rgb(0.7, 0.72, 0.71) });
       }
     }
 
