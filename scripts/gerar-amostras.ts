@@ -8,6 +8,8 @@ import { generateAnswerSheetsPdf } from "../src/lib/pdf/answer-sheet-pdf";
 import { sheetQuestionsFrom } from "../src/lib/answer-sheet/layout";
 import type { PdfTemplate } from "../src/lib/models/types";
 import { sampleAssessment, sampleQuestions } from "../tests/fixtures/sample-assessment";
+import { generateAssessmentDocx } from "../src/lib/docx/assessment-docx";
+import { examHeader } from "../src/lib/assessment/header";
 
 async function main() {
   mkdirSync("amostras", { recursive: true });
@@ -17,6 +19,9 @@ async function main() {
     writeFileSync(`amostras/prova-${t}.pdf`, r.bytes);
     console.log(`prova-${t}.pdf — ${r.pageCount} página(s)`);
   }
+  const larga = sampleAssessment("larga_escala");
+  writeFileSync("amostras/prova-larga_escala.docx", await generateAssessmentDocx(examHeader({ ...larga, instructions: null }), questions));
+  console.log("prova-larga_escala.docx");
   const a = sampleAssessment("escolar");
   const cards = await generateAnswerSheetsPdf({
     assessmentTitle: a.title,

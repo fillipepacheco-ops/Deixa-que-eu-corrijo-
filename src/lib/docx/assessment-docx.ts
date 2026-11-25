@@ -1,0 +1,372 @@
+/**
+ * PROVA EDITÁVEL (.docx) — modelo de avaliação de larga escala.
+ *
+ * Padrão pedido pelos professores: A4, Arial 12, texto justificado,
+ * espaçamento 1,5, numeração automática "QUESTÃO 01", capa com cabeçalho
+ * (os mesmos dados do cartão-resposta) e instruções numeradas.
+ * Cada questão fica "presa" (manter com o próximo) para não ser cortada
+ * entre páginas quando o professor editar no Word.
+ */
+import {
+  AlignmentType,
+  BorderStyle,
+  Document,
+  Footer,
+  Header,
+  HeightRule,
+  ImageRun,
+  LevelFormat,
+  LineRuleType,
+  Packer,
+  PageBreak,
+  PageNumber,
+  Paragraph,
+  ShadingType,
+  Table,
+  TableCell,
+  TableRow,
+  TabStopType,
+  TextRun,
+  VerticalAlign,
+  WidthType,
+} from "docx";
+import type { AssessmentQuestion } from "@/lib/models/types";
+import { QUESTION_LABEL, formatDateBR, type ExamHeader } from "@/lib/assessment/header";
+import { imageSize } from "@/lib/assessment/image-size";
+
+const FONT = "Arial";
+const SIZE = 24; // meio-pontos → 12 pt
+const LINE_15 = { line: 360, lineRule: LineRuleType.AUTO }; // espaçamento 1,5
+const DARK = "0B3A1E";
+const MID = "137A1A";
+const GRAY = "5F6B65";
+const LIGHT = "F0F8EB";
+
+// A4 com margens de 2 cm (1134 DXA) → largura útil 9638 DXA
+const PAGE_W = 11906;
+const MARGIN = 1134;
+const CONTENT_W = PAGE_W - 2 * MARGIN;
+
+const cellBorder = { style: BorderStyle.SINGLE, size: 4, color: "B8C2BC" };
+const borders = { top: cellBorder, bottom: cellBorder, left: cellBorder, right: cellBorder };
+
+function fieldCell(label: string, value: string, width: number) {
+  return new TableCell({
+    width: { size: width, type: WidthType.DXA },
+    borders,
+    margins: { top: 60, bottom: 60, left: 120, right: 120 },
+    verticalAlign: VerticalAlign.TOP,
+    children: [
+      new Paragraph({
+        spacing: { after: 40 },
+        children: [new TextRun({ text: label.toUpperCase(), bold: true, size: 14, color: MID, font: FONT })],
+      }),
+      new Paragraph({
+        spacing: { after: 20 },
+        children: [new TextRun({ text: value || " ", size: SIZE, font: FONT })],
+      }),
+    ],
+  });
+}
+
+function row(cells: [string, string, number][]) {
+  return new TableRow({ cantSplit: true, children: cells.map(([l, v, w]) => fieldCell(l, v, w)) });
+}
+
+function coverPage(h: ExamHeader): (Paragraph | Table)[] {
+  const half = Math.round(CONTENT_W / 2);
+  const twoThirds = Math.round((CONTENT_W * 3) / 4);
+  const out: (Paragraph | Table)[] = [];
+
+  if (h.schoolName) {
+    out.push(
+      new Paragraph({
+        alignment: AlignmentType.CENTER,
+        spacing: { after: 80 },
+        children: [new TextRun({ text: h.schoolName.toUpperCase(), bold: true, size: SIZE, color: DARK, font: FONT })],
+      }),
+    );
+  }
+  out.push(
+    new Paragraph({
+      alignment: AlignmentType.CENTER,
+      spacing: { before: 120, after: 80 },
+      children: [new TextRun({ text: h.title, bold: true, size: 32, color: DARK, font: FONT })],
+    }),
+  );
+  const sub = [h.subject, h.gradeLevel].filter(Boolean).join("  •  ");
+  if (sub) {
+    out.push(
+      new Paragraph({
+        alignment: AlignmentType.CENTER,
+        spacing: { after: 280 },
+        border: { bottom: { style: BorderStyle.SINGLE, size: 12, color: MID, space: 8 } },
+        children: [new TextRun({ text: sub, size: SIZE, color: GRAY, font: FONT })],
+      }),
+    );
+  }
+
+  out.push(
+    new Table({
+      width: { size: CONTENT_W, type: WidthType.DXA },
+      columnWidths: [twoThirds, CONTENT_W - twoThirds],
+      rows: [
+        row([
+          ["Nome do(a) aluno(a)", "", twoThirds],
+          ["Nº", "", CONTENT_W - twoThirds],
+        ]),
+      ],
+    }),
+    new Table({
+      width: { size: CONTENT_W, type: WidthType.DXA },
+      columnWidths: [half, CONTENT_W - half],
+      rows: [
+        row([
+          ["Turma", h.className, half],
+          ["Data", formatDateBR(h.appliedOn), CONTENT_W - half],
+        ]),
+        row([
+          ["Disciplina", h.subject, half],
+          ["Professor(a)", h.teacherName, CONTENT_W - half],
+        ]),
+      ],
+    }),
+  );
+
+  out.push(
+    new Paragraph({
+      spacing: { before: 360, after: 120 },
+      shading: { type: ShadingType.CLEAR, color: "auto", fill: LIGHT },
+      children: [new TextRun({ text: "INSTRUÇÕES", bold: true, size: SIZE, color: DARK, font: FONT })],
+    }),
+    ...h.instructions.map(
+      (text) =>
+        new Paragraph({
+          numbering: { reference: "instrucoes", level: 0 },
+          alignment: AlignmentType.JUSTIFIED,
+          spacing: { ...LINE_15, after: 60 },
+          children: [new TextRun({ text, size: SIZE, font: FONT })],
+        }),
+    ),
+    new Paragraph({
+      alignment: AlignmentType.CENTER,
+      spacing: { before: 480 },
+      children: [
+        new TextRun({ text: "AGUARDE A AUTORIZAÇÃO DO APLICADOR PARA INICIAR A PROVA.", bold: true, size: SIZE, color: DARK, font: FONT }),
+      ],
+    }),
+    new Paragraph({ children: [new PageBreak()] }),
+  );
+  return out;
+}
+
+function questionBlocks(q: AssessmentQuestion, number: number): (Paragraph | Table)[] {
+  const blocks: (Paragraph | Table)[] = [];
+  const keep = { keepNext: true, keepLines: true };
+
+  const heading: TextRun[] = [new TextRun({ text: QUESTION_LABEL(number), bold: true, size: SIZE, color: DARK, font: FONT })];
+  if (q.weight !== 1) {
+    const v = q.weight.toLocaleString("pt-BR", { maximumFractionDigits: 2 });
+    heading.push(new TextRun({ text: `   (${v} ${q.weight === 1 ? "ponto" : "pontos"})`, italics: true, size: 20, color: GRAY, font: FONT }));
+  }
+  blocks.push(new Paragraph({ ...keep, spacing: { before: 360, after: 120 }, children: heading }));
+
+  const paragraphs = (q.statement || "").split(/\r?\n/).filter((p) => p.trim() !== "");
+  (paragraphs.length ? paragraphs : [" "]).forEach((p) =>
+    blocks.push(
+      new Paragraph({
+        ...keep,
+        alignment: AlignmentType.JUSTIFIED,
+        spacing: { ...LINE_15, after: 120 },
+        children: [new TextRun({ text: p, size: SIZE, font: FONT })],
+      }),
+    ),
+  );
+
+  if (q.image) {
+    const { width, height } = imageSize(q.image.bytes, q.image.kind);
+    const maxPx = Math.round(((q.image.widthMm ?? 120) / 25.4) * 96);
+    const scale = Math.min(1, maxPx / width, 380 / height);
+    blocks.push(
+      new Paragraph({
+        ...keep,
+        alignment: AlignmentType.CENTER,
+        spacing: { after: 120 },
+        children: [
+          new ImageRun({
+            type: q.image.kind,
+            data: q.image.bytes,
+            transformation: { width: Math.round(width * scale), height: Math.round(height * scale) },
+          }),
+        ],
+      }),
+    );
+  }
+
+  if (q.table_data?.rows?.length) {
+    const rows = q.table_data.rows;
+    const ncols = Math.max(...rows.map((r) => r.length));
+    const colW = Math.floor(CONTENT_W / ncols);
+    const widths = Array.from({ length: ncols }, (_, i) => (i === ncols - 1 ? CONTENT_W - colW * (ncols - 1) : colW));
+    blocks.push(
+      new Table({
+        width: { size: CONTENT_W, type: WidthType.DXA },
+        columnWidths: widths,
+        rows: rows.map(
+          (r, ri) =>
+            new TableRow({
+              cantSplit: true,
+              children: widths.map(
+                (w, ci) =>
+                  new TableCell({
+                    width: { size: w, type: WidthType.DXA },
+                    borders,
+                    shading: ri === 0 ? { type: ShadingType.CLEAR, color: "auto", fill: LIGHT } : undefined,
+                    margins: { top: 60, bottom: 60, left: 100, right: 100 },
+                    children: [
+                      new Paragraph({
+                        keepNext: true,
+                        alignment: AlignmentType.CENTER,
+                        children: [new TextRun({ text: r[ci] ?? "", bold: ri === 0, size: 22, font: FONT })],
+                      }),
+                    ],
+                  }),
+              ),
+            }),
+        ),
+      }),
+      new Paragraph({ keepNext: true, spacing: { after: 60 }, children: [] }),
+    );
+  }
+
+  if (q.type === "multiple_choice") {
+    q.options.forEach((opt, i) => {
+      const last = i === q.options.length - 1;
+      blocks.push(
+        new Paragraph({
+          keepNext: !last,
+          keepLines: true,
+          alignment: AlignmentType.JUSTIFIED,
+          indent: { left: 567, hanging: 567 },
+          tabStops: [{ type: TabStopType.LEFT, position: 567 }],
+          spacing: { ...LINE_15, after: 40 },
+          children: [
+            new TextRun({ text: `(${opt.label})`, bold: true, size: SIZE, color: MID, font: FONT }),
+            new TextRun({ text: `\t${opt.text}`, size: SIZE, font: FONT }),
+          ],
+        }),
+      );
+    });
+  } else if (q.type === "true_false") {
+    blocks.push(
+      new Paragraph({
+        spacing: { ...LINE_15 },
+        children: [new TextRun({ text: "(     ) Verdadeiro          (     ) Falso", size: SIZE, font: FONT })],
+      }),
+    );
+  } else {
+    // Linhas para resposta: tabela só com bordas inferiores (parágrafos com
+    // a mesma borda seriam agrupados numa caixa só pelo Word).
+    const lines = q.type === "short_answer" ? 2 : 6;
+    const none = { style: BorderStyle.NONE, size: 0, color: "FFFFFF" };
+    const line = { style: BorderStyle.SINGLE, size: 4, color: "B8C2BC" };
+    blocks.push(
+      new Table({
+        width: { size: CONTENT_W, type: WidthType.DXA },
+        columnWidths: [CONTENT_W],
+        borders: { top: none, bottom: none, left: none, right: none, insideHorizontal: none, insideVertical: none },
+        rows: Array.from(
+          { length: lines },
+          () =>
+            new TableRow({
+              cantSplit: true,
+              height: { value: 480, rule: HeightRule.EXACT },
+              children: [
+                new TableCell({
+                  width: { size: CONTENT_W, type: WidthType.DXA },
+                  borders: { top: none, left: none, right: none, bottom: line },
+                  children: [new Paragraph({ keepNext: true, children: [] })],
+                }),
+              ],
+            }),
+        ),
+      }),
+    );
+  }
+  return blocks;
+}
+
+export async function generateAssessmentDocx(header: ExamHeader, questions: AssessmentQuestion[]): Promise<Uint8Array> {
+  const sorted = [...questions].sort((a, b) => a.position - b.position);
+
+  const runningHeader = new Header({
+    children: [
+      new Paragraph({
+        tabStops: [{ type: TabStopType.RIGHT, position: CONTENT_W }],
+        border: { bottom: { style: BorderStyle.SINGLE, size: 4, color: "B8C2BC", space: 4 } },
+        children: [
+          new TextRun({ text: header.title, bold: true, size: 16, color: MID, font: FONT }),
+          new TextRun({ text: "\tAluno(a): ________________________________", size: 16, color: GRAY, font: FONT }),
+        ],
+      }),
+    ],
+  });
+
+  const footer = new Footer({
+    children: [
+      new Paragraph({
+        tabStops: [{ type: TabStopType.RIGHT, position: CONTENT_W }],
+        children: [
+          new TextRun({ text: [header.subject, header.className].filter(Boolean).join(" — "), size: 16, color: GRAY, font: FONT }),
+          new TextRun({ text: "\tPágina ", size: 16, bold: true, color: MID, font: FONT }),
+          new TextRun({ children: [PageNumber.CURRENT], size: 16, bold: true, color: MID, font: FONT }),
+          new TextRun({ text: " de ", size: 16, bold: true, color: MID, font: FONT }),
+          new TextRun({ children: [PageNumber.TOTAL_PAGES], size: 16, bold: true, color: MID, font: FONT }),
+        ],
+      }),
+    ],
+  });
+
+  const doc = new Document({
+    creator: "Deixa que eu Corrijo",
+    title: header.title,
+    styles: {
+      default: {
+        document: { run: { font: FONT, size: SIZE }, paragraph: { spacing: LINE_15 } },
+      },
+    },
+    numbering: {
+      config: [
+        {
+          reference: "instrucoes",
+          levels: [
+            {
+              level: 0,
+              format: LevelFormat.DECIMAL,
+              text: "%1.",
+              alignment: AlignmentType.LEFT,
+              style: { paragraph: { indent: { left: 567, hanging: 397 } }, run: { font: FONT, size: SIZE, bold: true, color: MID } },
+            },
+          ],
+        },
+      ],
+    },
+    sections: [
+      {
+        properties: {
+          titlePage: true, // capa sem cabeçalho/rodapé
+          page: {
+            size: { width: PAGE_W, height: 16838 },
+            margin: { top: MARGIN, bottom: MARGIN, left: MARGIN, right: MARGIN, header: 567, footer: 567 },
+          },
+        },
+        headers: { default: runningHeader, first: new Header({ children: [new Paragraph({ children: [] })] }) },
+        footers: { default: footer, first: new Footer({ children: [new Paragraph({ children: [] })] }) },
+        children: [...coverPage(header), ...sorted.flatMap((q, i) => questionBlocks(q, i + 1))],
+      },
+    ],
+  });
+
+  const buf = await Packer.toBuffer(doc);
+  return new Uint8Array(buf);
+}

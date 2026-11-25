@@ -69,5 +69,5 @@ tests/                    testes automatizados
 | 8 | PDF A4 (4 modelos, quebra de página sem cortar questão) | ✅ gerador + testes |
 | 9 | Cartão-resposta | ✅ gerador + testes |
 | 10–11 | Leitura por câmera + correção automática | ✅ motor + testes · tela da câmera: próxima etapa |
-| 5–6 | Criador de questões e de avaliação (telas) | ⏳ próxima etapa |
+| 5–6 | Criador de avaliação: cabeçalho, questões, gabarito; PDF + Word (.docx) + cartões | ✅ |
 | 12–14 | Resultados, relatório básico, Conselho básico | ⏳ |

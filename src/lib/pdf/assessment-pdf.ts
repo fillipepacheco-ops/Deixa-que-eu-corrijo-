@@ -9,7 +9,8 @@
  */
 import { PDFDocument, StandardFonts, rgb, type PDFImage, type PDFPage } from "pdf-lib";
 import type { Assessment, AssessmentQuestion, PdfTemplate } from "@/lib/models/types";
-import { A4, BRAND, drawTextTop, formatDateBR, mm, sanitize, wrapText } from "./common";
+import { A4, BRAND, drawLine, drawTextTop, formatDateBR, mm, sanitize, wrapLines, wrapText } from "./common";
+import { QUESTION_LABEL, examHeader } from "@/lib/assessment/header";
 
 export interface TemplateConfig {
   columns: 1 | 2;
@@ -17,23 +18,33 @@ export interface TemplateConfig {
   header: "full" | "compact" | "band";
   showGradeBox: boolean;
   showSignature: boolean;
-  questionHeading: "inline" | "boxed";
+  questionHeading: "inline" | "boxed" | "label";
   showWeights: boolean;
   essayLines: number;
+  /** Altura da linha em múltiplos do tamanho da fonte (1,5 do Word ≈ 1,725). */
+  lineHeight: number;
+  justify: boolean;
+  /** Capa com cabeçalho e instruções; questões a partir da página 2. */
+  coverPage: boolean;
 }
 
 export const TEMPLATES: Record<Exclude<PdfTemplate, "personalizado">, TemplateConfig> = {
   escolar: {
     columns: 1, fontSize: 11, header: "full", showGradeBox: true, showSignature: true,
     questionHeading: "inline", showWeights: true, essayLines: 6,
+    lineHeight: 1.38, justify: false, coverPage: false,
   },
   simulado: {
     columns: 2, fontSize: 9.5, header: "compact", showGradeBox: true, showSignature: false,
     questionHeading: "inline", showWeights: false, essayLines: 5,
+    lineHeight: 1.38, justify: false, coverPage: false,
   },
+  // Padrão de larga escala: Arial/Helvetica 12, justificado, espaçamento 1,5,
+  // "QUESTÃO 01" e capa com cabeçalho (mesmos dados do cartão-resposta).
   larga_escala: {
-    columns: 2, fontSize: 9.5, header: "band", showGradeBox: false, showSignature: false,
-    questionHeading: "boxed", showWeights: false, essayLines: 5,
+    columns: 1, fontSize: 12, header: "band", showGradeBox: false, showSignature: false,
+    questionHeading: "label", showWeights: true, essayLines: 6,
+    lineHeight: 1.725, justify: true, coverPage: true,
   },
 };
 
@@ -85,7 +96,7 @@ export async function generateAssessmentPdf(input: AssessmentPdfInput): Promise<
   const italic = await doc.embedFont(StandardFonts.HelveticaOblique);
 
   const fs = cfg.fontSize;
-  const lh = fs * 1.38;
+  const lh = fs * cfg.lineHeight;
   const contentW = A4.w - 2 * MARGIN_X;
   const colW = cfg.columns === 2 ? (contentW - COLUMN_GAP) / 2 : contentW;
 
@@ -119,6 +130,21 @@ export async function generateAssessmentPdf(input: AssessmentPdfInput): Promise<
       });
     }
 
+    // "QUESTÃO 01" em negrito (larga escala), com o valor ao lado.
+    if (cfg.questionHeading === "label") {
+      const label = QUESTION_LABEL(number);
+      pieces.push({
+        h: fs * 2,
+        draw: (page, x, top) => {
+          drawTextTop(page, label, { x, top, size: fs, font: bold, color: BRAND.dark });
+          if (cfg.showWeights && q.weight !== 1) {
+            const lw = bold.widthOfTextAtSize(label, fs);
+            drawTextTop(page, pointsLabel(q.weight), { x: x + lw + 8, top: top + fs * 0.1, size: fs * 0.8, font: italic, color: BRAND.gray });
+          }
+        },
+      });
+    }
+
     // Valor da questão (modelo escolar), discreto e alinhado à direita.
     if (cfg.questionHeading === "inline" && cfg.showWeights && q.weight !== 1) {
       const t = pointsLabel(q.weight);
@@ -133,7 +159,7 @@ export async function generateAssessmentPdf(input: AssessmentPdfInput): Promise<
 
     // Enunciado.
     const statement = q.statement?.trim() || "(enunciado não preenchido)";
-    const stLines = wrapText(regular, fs, statement, textW);
+    const stLines = wrapLines(regular, fs, statement, textW);
     stLines.forEach((line, i) => {
       pieces.push({
         h: lh,
@@ -141,7 +167,7 @@ export async function generateAssessmentPdf(input: AssessmentPdfInput): Promise<
           if (i === 0 && cfg.questionHeading === "inline") {
             drawTextTop(page, `${number}.`, { x, top, size: fs, font: bold, color: BRAND.dark });
           }
-          drawTextTop(page, line, { x: x + indent, top, size: fs, font: regular });
+          drawLine(page, line, { x: x + indent, top, size: fs, font: regular, width: textW, justify: cfg.justify });
         },
       });
     });
@@ -201,13 +227,13 @@ export async function generateAssessmentPdf(input: AssessmentPdfInput): Promise<
     if (q.type === "multiple_choice") {
       const optIndent = fs * 2.2;
       for (const opt of q.options) {
-        const lines = wrapText(regular, fs, opt.text, textW - optIndent);
+        const lines = wrapLines(regular, fs, opt.text, textW - optIndent);
         lines.forEach((line, i) => {
           pieces.push({
             h: lh,
             draw: (page, x, top) => {
               if (i === 0) drawTextTop(page, `(${opt.label})`, { x: x + indent, top, size: fs, font: bold, color: BRAND.mid });
-              drawTextTop(page, line, { x: x + indent + optIndent, top, size: fs, font: regular });
+              drawLine(page, line, { x: x + indent + optIndent, top, size: fs, font: regular, width: textW - optIndent, justify: cfg.justify });
             },
           });
         });
@@ -248,6 +274,11 @@ export async function generateAssessmentPdf(input: AssessmentPdfInput): Promise<
     page = doc.addPage([A4.w, A4.h]);
     pages.push(page);
     col = 0;
+    if (pages.length === 1 && cfg.coverPage) {
+      drawCover(page);
+      page = doc.addPage([A4.w, A4.h]);
+      pages.push(page);
+    }
     areaTop = pages.length === 1 ? drawFirstHeader(page) : drawRunningHeader(page);
     cursor = areaTop;
     if (cfg.columns === 2) {
@@ -351,6 +382,61 @@ export async function generateAssessmentPdf(input: AssessmentPdfInput): Promise<
     return top + mm(5);
   }
 
+  /** Capa: mesmos dados do cartão-resposta + instruções numeradas. */
+  function drawCover(p: PDFPage) {
+    const h = examHeader(assessment);
+    let top = MARGIN_TOP + mm(4);
+    const center = (text: string, size: number, font = regular, color = BRAND.ink) => {
+      for (const line of wrapText(font, size, text, contentW)) {
+        const w = font.widthOfTextAtSize(line, size);
+        drawTextTop(p, line, { x: MARGIN_X + (contentW - w) / 2, top, size, font, color });
+        top += size * 1.35;
+      }
+    };
+    if (h.schoolName) center(h.schoolName.toUpperCase(), 12, bold, BRAND.dark);
+    top += 4;
+    center(h.title, 16, bold, BRAND.dark);
+    const sub = [h.subject, h.gradeLevel].filter(Boolean).join("  •  ");
+    if (sub) center(sub, 12, regular, BRAND.gray);
+    top += 6;
+    p.drawLine({ start: { x: MARGIN_X, y: A4.h - top }, end: { x: MARGIN_X + contentW, y: A4.h - top }, thickness: 1.2, color: BRAND.mid });
+    top += mm(6);
+
+    const rowH = mm(12);
+    const field = (label: string, value: string, x: number, w: number) => {
+      p.drawRectangle({ x, y: A4.h - top - rowH, width: w, height: rowH, borderColor: BRAND.line, borderWidth: 0.6 });
+      drawTextTop(p, label.toUpperCase(), { x: x + 5, top: top + 4, size: 7, font: bold, color: BRAND.mid });
+      if (value) drawTextTop(p, value, { x: x + 5, top: top + 15, size: 12, font: regular });
+    };
+    const big = contentW * 0.75;
+    field("Nome do(a) aluno(a)", "", MARGIN_X, big);
+    field("Nº", "", MARGIN_X + big, contentW - big);
+    top += rowH;
+    const half = contentW / 2;
+    field("Turma", h.className, MARGIN_X, half);
+    field("Data", formatDateBR(h.appliedOn), MARGIN_X + half, half);
+    top += rowH;
+    field("Disciplina", h.subject, MARGIN_X, half);
+    field("Professor(a)", h.teacherName, MARGIN_X + half, half);
+    top += rowH + mm(9);
+
+    p.drawRectangle({ x: MARGIN_X, y: A4.h - top - 18, width: contentW, height: 18, color: BRAND.light });
+    drawTextTop(p, "INSTRUÇÕES", { x: MARGIN_X + 5, top: top + 4, size: 12, font: bold, color: BRAND.dark });
+    top += 26;
+    const numW = mm(8);
+    h.instructions.forEach((text, i) => {
+      drawTextTop(p, `${i + 1}.`, { x: MARGIN_X + 4, top, size: 12, font: bold, color: BRAND.mid });
+      const lines = wrapLines(regular, 12, text, contentW - numW - 4);
+      lines.forEach((line) => {
+        drawLine(p, line, { x: MARGIN_X + numW, top, size: 12, font: regular, width: contentW - numW - 4, justify: true });
+        top += 12 * 1.725;
+      });
+      top += 3;
+    });
+    top += mm(10);
+    center("AGUARDE A AUTORIZAÇÃO DO APLICADOR PARA INICIAR A PROVA.", 12, bold, BRAND.dark);
+  }
+
   function drawRunningHeader(p: PDFPage): number {
     const top = MARGIN_TOP;
     const title = sanitize(regular, assessment.title);
@@ -384,6 +470,7 @@ export async function generateAssessmentPdf(input: AssessmentPdfInput): Promise<
   // ---------- rodapé com paginação ----------
   const n = pages.length;
   pages.forEach((p, i) => {
+    if (i === 0 && cfg.coverPage) return; // capa sem rodapé (conta na numeração)
     const y = MARGIN_BOTTOM - mm(8);
     p.drawLine({ start: { x: MARGIN_X, y: y + 12 }, end: { x: MARGIN_X + contentW, y: y + 12 }, thickness: 0.5, color: BRAND.line });
     const left = sanitize(regular, [assessment.subject, assessment.title].filter(Boolean).join(" — "));

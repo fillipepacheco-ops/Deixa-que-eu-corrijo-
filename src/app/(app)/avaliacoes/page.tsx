@@ -1,0 +1,64 @@
+import type { Metadata } from "next";
+import Link from "next/link";
+import { ChevronRight, FilePlus2 } from "lucide-react";
+import { createClient } from "@/lib/supabase/server";
+import { Card, EmptyState, PageHeader } from "@/components/ui/PageHeader";
+import { buttonClass } from "@/components/ui/button";
+import { formatDateBR } from "@/lib/assessment/header";
+
+export const metadata: Metadata = { title: "Avaliações" };
+
+export default async function AvaliacoesPage() {
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from("assessments")
+    .select("id, title, subject, applied_on, created_at, classes(name), assessment_questions(count)")
+    .order("created_at", { ascending: false });
+  const items = data ?? [];
+
+  return (
+    <>
+      <PageHeader
+        title="Avaliações"
+        description="Crie a prova uma vez: o sistema gera o PDF, o arquivo editável do Word e os cartões-resposta com o mesmo cabeçalho."
+        actions={
+          <Link href="/avaliacoes/nova" className={buttonClass()}>
+            <FilePlus2 size={18} /> Nova avaliação
+          </Link>
+        }
+      />
+      {items.length === 0 ? (
+        <EmptyState
+          title="Nenhuma avaliação ainda"
+          text="Comece pelo cabeçalho (escola, turma, data); depois é só digitar as questões."
+          action={
+            <Link href="/avaliacoes/nova" className={buttonClass()}>
+              Criar primeira avaliação
+            </Link>
+          }
+        />
+      ) : (
+        <Card className="divide-y divide-line">
+          {items.map((a) => {
+            const n = (a.assessment_questions as unknown as { count: number }[])?.[0]?.count ?? 0;
+            const turma = (a.classes as unknown as { name: string } | null)?.name;
+            return (
+              <Link key={a.id} href={`/avaliacoes/${a.id}`} className="flex items-center gap-4 px-5 py-4 transition hover:bg-brand-50/60 active:bg-brand-50">
+                <span className="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-brand-50 text-brand-700">
+                  <FilePlus2 size={20} />
+                </span>
+                <span className="min-w-0 flex-1">
+                  <span className="block truncate font-bold text-brand-900">{a.title}</span>
+                  <span className="block truncate text-[13px] text-muted">
+                    {[a.subject, turma, formatDateBR(a.applied_on), `${n} ${n === 1 ? "questão" : "questões"}`].filter(Boolean).join(" · ")}
+                  </span>
+                </span>
+                <ChevronRight size={18} className="text-muted" />
+              </Link>
+            );
+          })}
+        </Card>
+      )}
+    </>
+  );
+}

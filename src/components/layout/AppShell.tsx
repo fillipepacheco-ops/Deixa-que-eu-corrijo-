@@ -93,7 +93,7 @@ export function AppShell({ teacherName, children }: { teacherName: string; child
       <main className="mx-auto max-w-6xl px-4 pb-28 pt-6 sm:px-6 lg:px-10 lg:pb-12 lg:pt-10">{children}</main>
 
       {/* Barra inferior (celular) */}
-      <nav className="fixed inset-x-0 bottom-0 z-30 grid grid-cols-3 border-t border-line bg-white pb-[env(safe-area-inset-bottom)] lg:hidden">
+      <nav className="fixed inset-x-0 bottom-0 z-30 grid grid-cols-4 border-t border-line bg-white pb-[env(safe-area-inset-bottom)] lg:hidden">
         {NAV.filter((n) => n.mobile).map((item) => {
           const Icon = item.icon;
           const active = isActive(item.href);

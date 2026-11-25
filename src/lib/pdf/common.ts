@@ -104,3 +104,44 @@ export function drawBrandMark(page: PDFPage, x: number, yTop: number, size: numb
   page.drawLine({ start: { x: x + 8.5 * s, y: y + 11.5 * s }, end: { x: x + 11 * s, y: y + 9 * s }, thickness: 1.8 * s, color: BRAND.vivid });
   page.drawLine({ start: { x: x + 11 * s, y: y + 9 * s }, end: { x: x + 15.5 * s, y: y + 15 * s }, thickness: 1.8 * s, color: BRAND.vivid });
 }
+
+export interface WrappedLine {
+  text: string;
+  /** Última linha do parágrafo: não é justificada. */
+  last: boolean;
+}
+
+/** Como wrapText, mas informa a última linha de cada parágrafo (para justificar). */
+export function wrapLines(font: PDFFont, size: number, text: string, maxWidth: number): WrappedLine[] {
+  const out: WrappedLine[] = [];
+  for (const paragraph of text.split(/\r?\n/)) {
+    const lines = wrapText(font, size, paragraph, maxWidth);
+    lines.forEach((t, i) => out.push({ text: t, last: i === lines.length - 1 }));
+  }
+  return out;
+}
+
+/** Desenha uma linha; se justify, distribui o espaço entre as palavras até a largura. */
+export function drawLine(
+  page: PDFPage,
+  line: WrappedLine,
+  opts: { x: number; top: number; size: number; font: PDFFont; width: number; justify: boolean; color?: ReturnType<typeof rgb> },
+) {
+  const words = line.text.split(" ").filter(Boolean);
+  if (!opts.justify || line.last || words.length < 2) {
+    drawTextTop(page, line.text, opts);
+    return;
+  }
+  const wordsW = words.reduce((s, w) => s + opts.font.widthOfTextAtSize(w, opts.size), 0);
+  const gap = (opts.width - wordsW) / (words.length - 1);
+  // Linha muito curta (gap exagerado): melhor não justificar.
+  if (gap > opts.size * 1.6) {
+    drawTextTop(page, line.text, opts);
+    return;
+  }
+  let x = opts.x;
+  for (const w of words) {
+    drawTextTop(page, w, { ...opts, x });
+    x += opts.font.widthOfTextAtSize(w, opts.size) + gap;
+  }
+}

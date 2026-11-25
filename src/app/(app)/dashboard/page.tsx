@@ -24,7 +24,7 @@ type Shortcut = { label: string; icon: LucideIcon; href?: string };
 const SHORTCUTS: Shortcut[] = [
   { label: "Turmas", icon: GraduationCap, href: "/turmas" },
   { label: "Alunos", icon: Users, href: "/alunos" },
-  { label: "Nova avaliação", icon: FilePlus2 },
+  { label: "Nova avaliação", icon: FilePlus2, href: "/avaliacoes/nova" },
   { label: "Corrigir pela câmera", icon: Camera },
   { label: "Banco de questões", icon: Library },
   { label: "Resultados", icon: BarChart3 },

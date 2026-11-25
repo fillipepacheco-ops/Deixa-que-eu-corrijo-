@@ -25,7 +25,7 @@ export interface NavItem {
 /** Menu principal (item 36 da especificação). */
 export const NAV: NavItem[] = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard, ready: true, mobile: true },
-  { href: "/avaliacoes", label: "Avaliações", icon: FileText, ready: false },
+  { href: "/avaliacoes", label: "Avaliações", icon: FileText, ready: true, mobile: true },
   { href: "/banco-de-questoes", label: "Banco de Questões", icon: Library, ready: false },
   { href: "/turmas", label: "Turmas", icon: GraduationCap, ready: true, mobile: true },
   { href: "/alunos", label: "Alunos", icon: Users, ready: true, mobile: true },
