@@ -1,23 +1,76 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { ArrowRight, BarChart3, Camera, ClipboardList, FileText, Gamepad2, GraduationCap, Library } from "lucide-react";
+import {
+  BarChart3,
+  Camera,
+  ChevronRight,
+  ClipboardList,
+  FilePlus2,
+  Gamepad2,
+  GraduationCap,
+  Library,
+  Users,
+  type LucideIcon,
+} from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
-import { Card, PageHeader } from "@/components/ui/PageHeader";
+import { Card } from "@/components/ui/PageHeader";
 import { buttonClass } from "@/components/ui/button";
 
 export const metadata: Metadata = { title: "Dashboard" };
 
-type Shortcut = { label: string; text: string; icon: typeof FileText; href?: string };
+type Shortcut = { label: string; icon: LucideIcon; href?: string };
 
+/** Botões da tela inicial. Sem href = funcionalidade futura (aparece "Em breve"). */
 const SHORTCUTS: Shortcut[] = [
-  { label: "Cadastrar turma e alunos", text: "O ponto de partida de tudo.", icon: GraduationCap, href: "/turmas" },
-  { label: "Criar avaliação", text: "Editor de prova, gabarito e PDF A4.", icon: FileText },
-  { label: "Montar prova com questões existentes", text: "A partir do seu banco de questões.", icon: Library },
-  { label: "Corrigir gabaritos pela câmera", text: "Fotografe o cartão-resposta.", icon: Camera },
-  { label: "Criar avaliação gamificada", text: "Quiz ao vivo com ranking.", icon: Gamepad2 },
-  { label: "Ver resultados", text: "Médias, questões mais erradas.", icon: BarChart3 },
-  { label: "Preparar Conselho de Classe", text: "Quem precisa ser mencionado.", icon: ClipboardList },
+  { label: "Turmas", icon: GraduationCap, href: "/turmas" },
+  { label: "Alunos", icon: Users, href: "/alunos" },
+  { label: "Nova avaliação", icon: FilePlus2 },
+  { label: "Corrigir pela câmera", icon: Camera },
+  { label: "Banco de questões", icon: Library },
+  { label: "Resultados", icon: BarChart3 },
+  { label: "Conselho de Classe", icon: ClipboardList },
+  { label: "Modo gamificado", icon: Gamepad2 },
 ];
+
+function AppButton({ s }: { s: Shortcut }) {
+  const Icon = s.icon;
+  const ready = Boolean(s.href);
+  const body = (
+    <>
+      {!ready && (
+        <span className="absolute right-2.5 top-2.5 rounded-full bg-brand-50 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-brand-700/80">
+          Em breve
+        </span>
+      )}
+      <span
+        className={`grid h-16 w-16 place-items-center rounded-[22px] shadow-sm transition ${
+          ready
+            ? "bg-linear-to-br from-brand-700 to-brand-900 text-white group-hover:shadow-md"
+            : "bg-brand-50 text-brand-700/45"
+        }`}
+      >
+        <Icon size={30} strokeWidth={1.9} />
+      </span>
+      <span className={`mt-3 text-center text-[14px] font-bold leading-tight ${ready ? "text-brand-900" : "text-muted/80"}`}>
+        {s.label}
+      </span>
+    </>
+  );
+  const base =
+    "group relative flex min-h-[156px] flex-col items-center justify-center rounded-3xl border bg-white px-3 pb-4 pt-9 select-none";
+  return ready ? (
+    <Link
+      href={s.href!}
+      className={`${base} border-line transition hover:-translate-y-0.5 hover:border-brand-200 hover:shadow-lg active:scale-[0.97]`}
+    >
+      {body}
+    </Link>
+  ) : (
+    <div className={`${base} border-line/70 bg-white/70`} title="Funcionalidade futura — em desenvolvimento" aria-disabled="true">
+      {body}
+    </div>
+  );
+}
 
 async function count(table: string, filter?: (q: any) => any) {
   const supabase = await createClient();
@@ -33,7 +86,7 @@ export default async function DashboardPage() {
     data: { user },
   } = await supabase.auth.getUser();
   const { data: profile } = await supabase.from("profiles").select("full_name").eq("id", user!.id).maybeSingle();
-  const firstName = (profile?.full_name ?? "").split(" ")[0];
+  const firstName = (profile?.full_name ?? "").trim().split(" ")[0];
 
   const [classes, students, assessments, pending, graded] = await Promise.all([
     count("classes"),
@@ -53,81 +106,64 @@ export default async function DashboardPage() {
     { label: "Turmas", value: classes },
     { label: "Alunos", value: students },
     { label: "Avaliações", value: assessments },
-    { label: "Provas corrigidas", value: graded },
+    { label: "Corrigidas", value: graded },
   ];
 
   return (
     <>
-      <PageHeader
-        eyebrow="Menos burocracia. Mais tempo para ensinar."
-        title={firstAccess ? "Bem-vindo ao Deixa que eu Corrijo" : `Olá${firstName ? `, ${firstName}` : ""}`}
-        description={
-          firstAccess
-            ? "Comece cadastrando uma turma. Depois, a mesma informação alimenta provas, cartões-resposta, correção e o Conselho de Classe."
-            : "Visão geral das suas turmas e avaliações."
-        }
-      />
+      {/* Saudação */}
+      <section className="mb-6 overflow-hidden rounded-3xl bg-brand-900 px-6 py-6 text-white sm:px-8 sm:py-7">
+        <p className="text-[12px] font-bold uppercase tracking-wider text-lime">Menos burocracia. Mais tempo para ensinar.</p>
+        <h1 className="mt-1.5 text-[26px] font-extrabold leading-tight tracking-tight sm:text-3xl">
+          {firstAccess ? "Bem-vindo ao Deixa que eu Corrijo" : `Olá${firstName ? `, ${firstName}` : ""}!`}
+        </h1>
+        <p className="mt-1.5 max-w-xl text-[14px] text-brand-100/85">
+          {firstAccess
+            ? "Comece cadastrando uma turma. A mesma informação alimenta provas, cartões-resposta, correção e o Conselho de Classe."
+            : "O que vamos fazer hoje?"}
+        </p>
 
-      {!firstAccess && (
-        <div className="mb-8 grid grid-cols-2 gap-3 lg:grid-cols-4">
-          {stats.map((s) => (
-            <Card key={s.label} className="p-5">
-              <p className="text-[13px] font-semibold text-muted">{s.label}</p>
-              <p className="mt-1 text-3xl font-extrabold tabular-nums text-brand-900">{s.value}</p>
-            </Card>
-          ))}
-        </div>
-      )}
+        {!firstAccess && (
+          <div className="mt-5 grid grid-cols-4 gap-2 sm:max-w-lg">
+            {stats.map((s) => (
+              <div key={s.label} className="rounded-2xl bg-white/8 px-3 py-2.5">
+                <p className="text-2xl font-extrabold tabular-nums">{s.value}</p>
+                <p className="text-[11px] font-semibold text-brand-100/75">{s.label}</p>
+              </div>
+            ))}
+          </div>
+        )}
+        {firstAccess && (
+          <Link href="/turmas" className={`${buttonClass("secondary")} mt-5 border-0`}>
+            <GraduationCap size={18} /> Criar minha primeira turma
+          </Link>
+        )}
+      </section>
 
       {pending > 0 && (
-        <div className="mb-8 rounded-xl border border-amber-200 bg-amber-50 px-5 py-4 text-[14px] text-amber-900">
+        <div className="mb-6 rounded-2xl border border-amber-200 bg-amber-50 px-5 py-4 text-[14px] text-amber-900">
           <strong>{pending}</strong> {pending === 1 ? "correção aguarda" : "correções aguardam"} sua revisão.
         </div>
       )}
 
-      <div className="grid gap-6 lg:grid-cols-[1fr_340px]">
+      <div className="grid gap-6 xl:grid-cols-[1fr_320px]">
+        {/* Botões estilo app */}
         <section>
-          <h2 className="mb-3 text-[15px] font-bold text-brand-900">{firstAccess ? "Por onde começar" : "Atalhos"}</h2>
-          <div className="grid gap-3 sm:grid-cols-2">
-            {SHORTCUTS.map((s) => {
-              const Icon = s.icon;
-              const inner = (
-                <>
-                  <span className={`grid h-10 w-10 shrink-0 place-items-center rounded-lg ${s.href ? "bg-brand-900 text-white" : "bg-brand-50 text-brand-700/60"}`}>
-                    <Icon size={19} />
-                  </span>
-                  <span className="min-w-0 flex-1">
-                    <span className="flex items-center gap-2 font-bold text-brand-900">
-                      {s.label}
-                      {!s.href && (
-                        <span className="rounded bg-brand-50 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-brand-700">
-                          em breve
-                        </span>
-                      )}
-                    </span>
-                    <span className="block text-[13px] text-muted">{s.text}</span>
-                  </span>
-                </>
-              );
-              return s.href ? (
-                <Link key={s.label} href={s.href} className="flex items-center gap-3 rounded-xl border border-line bg-white p-4 transition hover:border-brand-200 hover:bg-brand-50/50">
-                  {inner}
-                  <ArrowRight size={17} className="text-brand-700" />
-                </Link>
-              ) : (
-                <div key={s.label} className="flex items-center gap-3 rounded-xl border border-line bg-white/60 p-4" title="Funcionalidade futura — em desenvolvimento">
-                  {inner}
-                </div>
-              );
-            })}
+          <h2 className="mb-3 text-[15px] font-bold text-brand-900">Acesso rápido</h2>
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+            {SHORTCUTS.map((s) => (
+              <AppButton key={s.label} s={s} />
+            ))}
           </div>
         </section>
 
-        <aside className="space-y-6">
+        <aside>
           <Card>
             <div className="flex items-center justify-between border-b border-line px-5 py-3.5">
               <h2 className="font-bold text-brand-900">Últimas turmas</h2>
-              <Link href="/turmas" className="text-[13px] font-semibold text-brand-700 hover:underline">Ver todas</Link>
+              <Link href="/turmas" className="text-[13px] font-semibold text-brand-700 hover:underline">
+                Ver todas
+              </Link>
             </div>
             {recentClasses?.length ? (
               <ul className="divide-y divide-line">
@@ -135,37 +171,25 @@ export default async function DashboardPage() {
                   const n = (c.students as unknown as { count: number }[])?.[0]?.count ?? 0;
                   return (
                     <li key={c.id}>
-                      <Link href={`/turmas/${c.id}`} className="flex items-center justify-between px-5 py-3 hover:bg-brand-50/50">
-                        <span>
-                          <span className="block font-semibold">{c.name}</span>
-                          {c.subject && <span className="block text-[12px] text-muted">{c.subject}</span>}
+                      <Link href={`/turmas/${c.id}`} className="flex items-center gap-3 px-5 py-3 hover:bg-brand-50/60 active:bg-brand-50">
+                        <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-brand-50 text-[13px] font-extrabold text-brand-900">
+                          {c.name.slice(0, 3)}
                         </span>
-                        <span className="text-[13px] text-muted">{n} alunos</span>
+                        <span className="min-w-0 flex-1">
+                          <span className="block truncate font-semibold">{c.name}</span>
+                          <span className="block text-[12px] text-muted">
+                            {[c.subject, `${n} ${n === 1 ? "aluno" : "alunos"}`].filter(Boolean).join(" · ")}
+                          </span>
+                        </span>
+                        <ChevronRight size={17} className="text-muted" />
                       </Link>
                     </li>
                   );
                 })}
               </ul>
             ) : (
-              <div className="p-5 text-sm text-muted">
-                Nenhuma turma ainda.
-                <Link href="/turmas" className={`${buttonClass()} mt-3 w-full`}>Criar primeira turma</Link>
-              </div>
+              <p className="px-5 py-6 text-sm text-muted">Nenhuma turma ainda.</p>
             )}
-          </Card>
-
-          <Card className="p-5">
-            <h2 className="font-bold text-brand-900">Fluxo do Deixa que eu Corrijo</h2>
-            <ol className="mt-3 space-y-2 text-[13px] text-muted">
-              {["Criar a avaliação", "Gerar PDF e cartão-resposta", "Aplicar e fotografar os cartões", "Corrigir e calcular notas", "Analisar resultados", "Preparar o Conselho de Classe"].map(
-                (step, i) => (
-                  <li key={step} className="flex gap-3">
-                    <span className="font-bold tabular-nums text-brand-700">{String(i + 1).padStart(2, "0")}</span>
-                    {step}
-                  </li>
-                ),
-              )}
-            </ol>
           </Card>
         </aside>
       </div>
