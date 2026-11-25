@@ -22,7 +22,7 @@ export async function addStudent(classId: string, _: FormState, formData: FormDa
     registration: String(formData.get("registration") ?? "").trim() || null,
     roll_number: Number.isInteger(roll) && roll > 0 ? roll : null,
   });
-  if (error) return { error: "Não foi possível adicionar o aluno." };
+  if (error) return { error: `Não foi possível adicionar o aluno. (${error.message})` };
   refresh(classId);
   return { ok: true };
 }
@@ -33,7 +33,7 @@ export async function addStudentsBulk(classId: string, _: FormState, formData: F
   if (rows.length === 0) return { error: "Cole pelo menos um nome." };
   const supabase = await createClient();
   const { error } = await supabase.from("students").insert(rows.map((r) => ({ ...r, class_id: classId })));
-  if (error) return { error: "Não foi possível importar a lista." };
+  if (error) return { error: `Não foi possível importar a lista. (${error.message})` };
   refresh(classId);
   return { ok: true };
 }
@@ -51,7 +51,7 @@ export async function updateStudent(id: string, classId: string, _: FormState, f
       roll_number: Number.isInteger(roll) && roll > 0 ? roll : null,
     })
     .eq("id", id);
-  if (error) return { error: "Não foi possível salvar." };
+  if (error) return { error: `Não foi possível salvar. (${error.message})` };
   refresh(classId);
   return { ok: true };
 }

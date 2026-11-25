@@ -23,7 +23,7 @@ export async function createClass(_: FormState, formData: FormData): Promise<For
   if (!data.name) return { error: "Dê um nome para a turma (ex.: 9º A)." };
   const supabase = await createClient();
   const { data: row, error } = await supabase.from("classes").insert(data).select("id").single();
-  if (error) return { error: "Não foi possível salvar a turma. Tente novamente." };
+  if (error) return { error: `Não foi possível salvar a turma. (${error.message})` };
   revalidatePath("/turmas");
   revalidatePath("/dashboard");
   redirect(`/turmas/${row.id}`);
@@ -34,7 +34,7 @@ export async function updateClass(id: string, _: FormState, formData: FormData):
   if (!data.name) return { error: "A turma precisa de um nome." };
   const supabase = await createClient();
   const { error } = await supabase.from("classes").update(data).eq("id", id);
-  if (error) return { error: "Não foi possível salvar as alterações." };
+  if (error) return { error: `Não foi possível salvar as alterações. (${error.message})` };
   revalidatePath(`/turmas/${id}`);
   revalidatePath("/turmas");
   return { ok: true };

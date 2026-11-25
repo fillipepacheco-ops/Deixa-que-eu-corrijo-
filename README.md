@@ -11,7 +11,8 @@ Stack: Next.js (App Router) · TypeScript · Tailwind · Supabase (Auth, Postgre
 ## Como colocar no ar (pelo iPad/celular)
 
 1. **Supabase** → crie um projeto → *SQL Editor* → cole o conteúdo de `supabase/migrations/0001_schema_inicial.sql` → **Run**.
-2. Supabase → *Authentication → URL Configuration* → em **Site URL** coloque o endereço da Vercel (ex.: `https://deixa-que-eu-corrijo.vercel.app`) e adicione `https://SEU-ENDERECO/auth/confirm` em *Redirect URLs*.
+2. Ainda no SQL Editor, rode também `supabase/migrations/0002_permissoes_api.sql`.
+3. Supabase → *Authentication → URL Configuration* → em **Site URL** coloque o endereço da Vercel (ex.: `https://deixa-que-eu-corrijo.vercel.app`) e adicione `https://SEU-ENDERECO/auth/confirm` em *Redirect URLs*.
 3. **Vercel** → *Add New Project* → importe este repositório → em *Environment Variables* cadastre:
    - `NEXT_PUBLIC_SUPABASE_URL`
    - `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` (ou o nome antigo `NEXT_PUBLIC_SUPABASE_ANON_KEY`)
