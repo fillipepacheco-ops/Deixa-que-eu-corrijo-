@@ -30,7 +30,7 @@ function NavLink({ item, active, onClick }: { item: NavItem; active: boolean; on
         active ? "bg-white/12 text-white" : "text-white/75 hover:bg-white/6 hover:text-white"
       }`}
     >
-      <Icon size={18} strokeWidth={active ? 2.2 : 1.8} className={active ? "text-brand-500" : ""} />
+      <Icon size={18} strokeWidth={active ? 2.2 : 1.8} className={active ? "text-lime" : ""} />
       {item.label}
     </Link>
   );
@@ -44,7 +44,7 @@ export function AppShell({ teacherName, children }: { teacherName: string; child
   const sidebar = (
     <div className="flex h-full flex-col bg-brand-900 px-3 py-5">
       <div className="px-2 pb-6">
-        <Logo light size={34} />
+        <Logo onDark height={42} />
       </div>
       <nav className="flex-1 space-y-0.5 overflow-y-auto">
         {NAV.map((item) => (
@@ -69,7 +69,7 @@ export function AppShell({ teacherName, children }: { teacherName: string; child
 
       {/* Celular/tablet: topo + gaveta */}
       <header className="sticky top-0 z-30 flex items-center justify-between border-b border-line bg-white/90 px-4 py-3 backdrop-blur lg:hidden">
-        <Logo size={30} />
+        <Logo height={34} />
         <button onClick={() => setOpen(true)} aria-label="Abrir menu" className="rounded-lg p-2 text-brand-900 hover:bg-brand-50">
           <Menu size={22} />
         </button>

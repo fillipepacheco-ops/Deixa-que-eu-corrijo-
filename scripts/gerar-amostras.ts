@@ -2,7 +2,7 @@
  * Gera PDFs de amostra em ./amostras (prova nos 4 modelos + cartões-resposta).
  * Uso: npm run samples
  */
-import { mkdirSync, writeFileSync } from "node:fs";
+import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { generateAssessmentPdf } from "../src/lib/pdf/assessment-pdf";
 import { generateAnswerSheetsPdf } from "../src/lib/pdf/answer-sheet-pdf";
 import { sheetQuestionsFrom } from "../src/lib/answer-sheet/layout";
@@ -25,6 +25,7 @@ async function main() {
     schoolName: a.school_name,
     appliedOn: a.applied_on,
     questions: sheetQuestionsFrom(questions),
+    logoPng: readFileSync("public/brand/logo.png"),
     cards: [
       { sheetNumber: 1001, studentName: "Ana Beatriz Souza", rollNumber: 1 },
       { sheetNumber: 1002 },

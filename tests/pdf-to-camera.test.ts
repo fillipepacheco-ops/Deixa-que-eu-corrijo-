@@ -51,6 +51,7 @@ test("ponta a ponta: PDF do cartão → marcações → foto → leitura → not
     className: "9º B",
     questions,
     cards: [{ sheetNumber: 31337, studentName: "Maria Souza", rollNumber: 14 }],
+    logoPng: readFileSync("public/brand/logo.png"), // a logo não pode atrapalhar a leitura
   });
 
   // O "aluno" preenche: caneta azul-escura.

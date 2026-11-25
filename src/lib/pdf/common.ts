@@ -8,10 +8,10 @@ export const mm = (v: number) => (v * 72) / 25.4;
 
 /** Paleta da marca (mesma do app). */
 export const BRAND = {
-  dark: rgb(0x0b / 255, 0x3d / 255, 0x2e / 255), // verde escuro
-  mid: rgb(0x14 / 255, 0x68 / 255, 0x4a / 255), // verde médio
-  vivid: rgb(0x1f / 255, 0xb3 / 255, 0x6b / 255), // verde vivo
-  light: rgb(0xee / 255, 0xf7 / 255, 0xf1 / 255), // verde muito claro
+  dark: rgb(0x0b / 255, 0x3a / 255, 0x1e / 255), // verde escuro (logo)
+  mid: rgb(0x13 / 255, 0x7a / 255, 0x1a / 255), // verde médio (logo)
+  vivid: rgb(0x5c / 255, 0xb3 / 255, 0x1a / 255), // verde vivo (check da logo)
+  light: rgb(0xf0 / 255, 0xf8 / 255, 0xeb / 255), // verde muito claro
   ink: rgb(0.1, 0.12, 0.11),
   gray: rgb(0.42, 0.45, 0.43),
   line: rgb(0.72, 0.75, 0.73),

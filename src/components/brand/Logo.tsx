@@ -1,25 +1,34 @@
-/** Símbolo: folha com check — correção simplificada. Funciona de 16px a cartaz. */
-export function LogoMark({ size = 36, className = "" }: { size?: number; className?: string }) {
-  return (
-    <svg width={size} height={size} viewBox="0 0 64 64" className={className} aria-hidden="true">
-      <rect width="64" height="64" rx="14" fill="#0B3D2E" />
-      <path d="M19 12h18l9 9v31a2 2 0 0 1-2 2H19a2 2 0 0 1-2-2V14a2 2 0 0 1 2-2z" fill="#FFFFFF" />
-      <path d="M37 12v7a2 2 0 0 0 2 2h7z" fill="#D7EFE0" />
-      <path d="M23.5 35.5l6 6 12-13.5" fill="none" stroke="#1FB36B" strokeWidth="5" strokeLinecap="round" strokeLinejoin="round" />
-    </svg>
+/* eslint-disable @next/next/no-img-element */
+
+/**
+ * Logo oficial do Deixa que eu Corrijo (public/brand/logo.png).
+ * Em fundos escuros, use onDark: a logo vai dentro de um cartão branco,
+ * porque o texto "Deixa que eu" é verde-escuro.
+ */
+export function Logo({ height = 40, onDark = false }: { height?: number; onDark?: boolean }) {
+  const img = (
+    <img
+      src="/brand/logo.png"
+      alt="Deixa que eu Corrijo"
+      style={{ height, width: "auto" }}
+      className="block select-none"
+      draggable={false}
+    />
   );
+  if (!onDark) return img;
+  return <span className="inline-block rounded-xl bg-white px-3 py-2 shadow-sm">{img}</span>;
 }
 
-export function Logo({ light = false, size = 36 }: { light?: boolean; size?: number }) {
+/** Só o símbolo (folha com check), para espaços pequenos. */
+export function LogoMark({ size = 36, className = "" }: { size?: number; className?: string }) {
   return (
-    <span className="inline-flex items-center gap-2.5">
-      <LogoMark size={size} />
-      <span className={`leading-[1.05] ${light ? "text-white" : "text-brand-900"}`}>
-        <span className="block text-[15px] font-medium tracking-tight">Deixa que eu</span>
-        <span className="block text-[17px] font-extrabold tracking-tight">
-          Corrijo<span className="text-brand-500">.</span>
-        </span>
-      </span>
-    </span>
+    <img
+      src="/brand/simbolo.png"
+      alt=""
+      aria-hidden="true"
+      style={{ width: size, height: size }}
+      className={`block select-none ${className}`}
+      draggable={false}
+    />
   );
 }

@@ -22,6 +22,8 @@ export interface AnswerSheetInput {
   appliedOn?: string | null;
   questions: SheetQuestionSpec[];
   cards: AnswerSheetCard[];
+  /** Logo oficial em PNG (public/brand/logo.png). Sem ela, usa o símbolo em vetor. */
+  logoPng?: Uint8Array | null;
 }
 
 const toX = (xMm: number) => mm(xMm);
@@ -37,6 +39,7 @@ export async function generateAnswerSheetsPdf(input: AnswerSheetInput): Promise<
   doc.setCreator("Deixa que eu Corrijo");
   const regular = await doc.embedFont(StandardFonts.Helvetica);
   const bold = await doc.embedFont(StandardFonts.HelveticaBold);
+  const logo = input.logoPng ? await doc.embedPng(input.logoPng) : null;
 
   for (const card of input.cards) {
     const page = doc.addPage([A4.w, A4.h]);
@@ -69,10 +72,18 @@ export async function generateAnswerSheetsPdf(input: AnswerSheetInput): Promise<
     }
 
     // Cabeçalho.
-    drawBrandMark(page, mm(14), mm(24), mm(9));
-    drawTextTop(page, "CARTÃO-RESPOSTA", { x: mm(26), top: mm(24), size: 14, font: bold, color: BRAND.dark });
+    let titleX = mm(26);
+    if (logo) {
+      const h = mm(11);
+      const w = (logo.width / logo.height) * h;
+      page.drawImage(logo, { x: mm(14), y: A4.h - mm(22) - h, width: w, height: h });
+      titleX = mm(14) + w + mm(5);
+    } else {
+      drawBrandMark(page, mm(14), mm(24), mm(9));
+    }
+    drawTextTop(page, "CARTÃO-RESPOSTA", { x: titleX, top: mm(23.5), size: 14, font: bold, color: BRAND.dark });
     drawTextTop(page, `Cartão nº ${String(card.sheetNumber).padStart(7, "0")}`, {
-      x: mm(26), top: mm(30.5), size: 8, font: regular, color: BRAND.gray,
+      x: titleX, top: mm(30), size: 8, font: regular, color: BRAND.gray,
     });
 
     const field = (label: string, value: string, x: number, top: number, w: number) => {

@@ -2,14 +2,16 @@
 
 /* Identidade visual — Deixa que eu Corrijo */
 @theme {
-  --color-brand-950: #062118;
-  --color-brand-900: #0b3d2e; /* verde escuro */
-  --color-brand-800: #0f4f3b;
-  --color-brand-700: #14684a; /* verde médio */
-  --color-brand-500: #1fb36b; /* verde vivo (destaque) */
-  --color-brand-200: #bfe5cf;
-  --color-brand-100: #d7efe0;
-  --color-brand-50: #eef7f1; /* fundo */
+  /* Tons tirados da logo oficial (public/brand/logo.png) */
+  --color-brand-950: #051f10;
+  --color-brand-900: #0b3a1e; /* verde escuro (documento e "Deixa que eu") */
+  --color-brand-800: #0f4a27;
+  --color-brand-700: #137a1a; /* verde médio ("Corrijo") */
+  --color-brand-500: #5cb31a; /* verde vivo (check) */
+  --color-lime: #7cc520; /* verde-limão (traço e órbita) */
+  --color-brand-200: #c4e6b0;
+  --color-brand-100: #ddf0d0;
+  --color-brand-50: #f0f8eb; /* fundo */
   --color-ink: #17201c;
   --color-muted: #5f6b65;
   --color-line: #dfe7e2;
@@ -19,7 +21,7 @@
 
 html {
   color: var(--color-ink);
-  background: #f6faf7;
+  background: #f7fbf4;
   -webkit-tap-highlight-color: transparent;
 }
 

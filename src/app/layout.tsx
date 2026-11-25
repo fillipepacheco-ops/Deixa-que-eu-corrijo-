@@ -7,11 +7,11 @@ const jakarta = Plus_Jakarta_Sans({ subsets: ["latin"], variable: "--font-jakart
 export const metadata: Metadata = {
   title: { default: "Deixa que eu Corrijo", template: "%s · Deixa que eu Corrijo" },
   description: "Menos burocracia. Mais tempo para ensinar.",
-  icons: { icon: "/icon.svg", apple: "/icon.svg" },
+  appleWebApp: { capable: true, title: "Corrijo", statusBarStyle: "default" },
 };
 
 export const viewport: Viewport = {
-  themeColor: "#0b3d2e",
+  themeColor: "#0b3a1e",
   width: "device-width",
   initialScale: 1,
 };

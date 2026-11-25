@@ -160,7 +160,7 @@ export default async function DashboardPage() {
               {["Criar a avaliação", "Gerar PDF e cartão-resposta", "Aplicar e fotografar os cartões", "Corrigir e calcular notas", "Analisar resultados", "Preparar o Conselho de Classe"].map(
                 (step, i) => (
                   <li key={step} className="flex gap-3">
-                    <span className="font-bold tabular-nums text-brand-500">{String(i + 1).padStart(2, "0")}</span>
+                    <span className="font-bold tabular-nums text-brand-700">{String(i + 1).padStart(2, "0")}</span>
                     {step}
                   </li>
                 ),
