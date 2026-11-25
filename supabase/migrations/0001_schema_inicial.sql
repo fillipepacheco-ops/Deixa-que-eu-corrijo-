@@ -433,6 +433,8 @@ end $$;
 
 -- Auditoria não se apaga nem se edita pelo app.
 drop policy if exists "somente o dono" on audit_log;
+drop policy if exists "ler o próprio log" on audit_log;
+drop policy if exists "gravar o próprio log" on audit_log;
 create policy "ler o próprio log" on audit_log for select using (owner_id = auth.uid());
 create policy "gravar o próprio log" on audit_log for insert with check (owner_id = auth.uid());
 
