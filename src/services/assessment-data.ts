@@ -55,7 +55,11 @@ export function toQuestion(row: QuestionRow): AssessmentQuestion {
     type: row.type,
     statement: row.statement,
     options: row.options ?? [],
-    correct_answers: row.correct_answers ?? [],
+    // Questões antigas de verdadeiro/falso (V/F) passam a certo/errado (C/E).
+    correct_answers:
+      row.type === "true_false"
+        ? (row.correct_answers ?? []).map((a) => (a === "V" ? "C" : a === "F" ? "E" : a))
+        : (row.correct_answers ?? []),
     weight: Number(row.weight),
     annulled: row.annulled,
     table_data: row.table_data,

@@ -168,7 +168,7 @@ create table if not exists questions (
   type question_type not null default 'multiple_choice',
   statement text not null,
   options jsonb not null default '[]'::jsonb,        -- [{ "label": "A", "text": "..." }]
-  correct_answers text[] not null default '{}',      -- ["B"] ou ["V"] etc.
+  correct_answers text[] not null default '{}',      -- ["B"] ou ["C"]/["E"] (certo/errado)
   subject text,
   grade_level text,
   topic text,                                        -- assunto

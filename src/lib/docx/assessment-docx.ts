@@ -30,9 +30,11 @@ import {
   VerticalAlign,
   WidthType,
 } from "docx";
+import JSZip from "jszip";
 import type { AssessmentQuestion } from "@/lib/models/types";
 import { QUESTION_LABEL, formatDateBR, type ExamHeader } from "@/lib/assessment/header";
 import { imageSize } from "@/lib/assessment/image-size";
+import { markupToDocx } from "./math-runs";
 
 const FONT = "Arial";
 const SIZE = 24; // meio-pontos → 12 pt
@@ -202,7 +204,7 @@ function questionBlocks(q: AssessmentQuestion, number: number): (Paragraph | Tab
         ...keep,
         alignment: AlignmentType.JUSTIFIED,
         spacing: { ...LINE_15, after: 120 },
-        children: [new TextRun({ text: p, size: SIZE, font: FONT })],
+        children: markupToDocx(p, { size: SIZE, font: FONT }),
       }),
     ),
   );
@@ -276,7 +278,8 @@ function questionBlocks(q: AssessmentQuestion, number: number): (Paragraph | Tab
           spacing: { ...LINE_15, after: 40 },
           children: [
             new TextRun({ text: `(${opt.label})`, bold: true, size: SIZE, color: MID, font: FONT }),
-            new TextRun({ text: `\t${opt.text}`, size: SIZE, font: FONT }),
+            new TextRun({ text: "\t", size: SIZE, font: FONT }),
+            ...markupToDocx(opt.text, { size: SIZE, font: FONT }),
           ],
         }),
       );
@@ -285,7 +288,7 @@ function questionBlocks(q: AssessmentQuestion, number: number): (Paragraph | Tab
     blocks.push(
       new Paragraph({
         spacing: { ...LINE_15 },
-        children: [new TextRun({ text: "(     ) Verdadeiro          (     ) Falso", size: SIZE, font: FONT })],
+        children: [new TextRun({ text: "(     ) Certo          (     ) Errado", size: SIZE, font: FONT })],
       }),
     );
   } else {
@@ -408,5 +411,10 @@ export async function generateAssessmentDocx(header: ExamHeader, questions: Asse
   });
 
   const buf = await Packer.toBuffer(doc);
-  return new Uint8Array(buf);
+  // Remove as entradas de pasta do ZIP: o Word/OneDrive/Google Drive às vezes
+  // recusa abrir .docx que as contenham.
+  const zip = await JSZip.loadAsync(buf);
+  // (zip.remove() de uma pasta apagaria os arquivos dentro dela; só tiramos a entrada.)
+  for (const name of Object.keys(zip.files)) if (zip.files[name].dir) delete zip.files[name];
+  return zip.generateAsync({ type: "uint8array", compression: "DEFLATE" });
 }

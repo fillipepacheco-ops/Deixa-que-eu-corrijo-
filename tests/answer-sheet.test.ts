@@ -44,7 +44,7 @@ test("só questões objetivas vão para o cartão, na ordem da prova", () => {
   ]);
   assert.deepEqual(specs, [
     { number: 1, labels: ["A", "B", "C", "D"] },
-    { number: 3, labels: ["V", "F"] },
+    { number: 3, labels: ["C", "E"], certoErrado: true },
   ]);
 });
 
@@ -124,18 +124,18 @@ test("leitura: cartão em branco com nº de chamada", () => {
   assert.equal(r.answers[3], "B");
 });
 
-test("leitura: V/F e mais de 20 questões (várias colunas)", () => {
+test("leitura: certo/errado e mais de 20 questões (várias colunas)", () => {
   const specs = [
     ...Array.from({ length: 30 }, (_, i) => ({ number: i + 1, labels: ["A", "B", "C", "D"] })),
-    { number: 31, labels: ["V", "F"] },
-    { number: 32, labels: ["V", "F"] },
+    { number: 31, labels: ["C", "E"], certoErrado: true },
+    { number: 32, labels: ["C", "E"], certoErrado: true },
   ];
-  const img = renderSheetPhoto({ questions: specs, sheetNumber: 99, marks: { 21: "D", 30: "A", 31: "V", 32: "F" } });
+  const img = renderSheetPhoto({ questions: specs, sheetNumber: 99, marks: { 21: "D", 30: "A", 31: "C", 32: "E" } });
   const r = readAnswerSheet(img, specs);
   assert.equal(r.answers[21], "D");
   assert.equal(r.answers[30], "A");
-  assert.equal(r.answers[31], "V");
-  assert.equal(r.answers[32], "F");
+  assert.equal(r.answers[31], "C");
+  assert.equal(r.answers[32], "E");
 });
 
 test("leitura: imagem sem cartão retorna orientação, não inventa resultado", () => {

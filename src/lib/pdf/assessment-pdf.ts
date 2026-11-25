@@ -11,6 +11,7 @@ import { PDFDocument, StandardFonts, rgb, type PDFImage, type PDFPage } from "pd
 import type { Assessment, AssessmentQuestion, PdfTemplate } from "@/lib/models/types";
 import { A4, BRAND, drawLine, drawTextTop, formatDateBR, mm, sanitize, wrapLines, wrapText } from "./common";
 import { QUESTION_LABEL, examHeader } from "@/lib/assessment/header";
+import { layoutRich, type RichFonts } from "./rich-text";
 
 export interface TemplateConfig {
   columns: 1 | 2;
@@ -104,6 +105,8 @@ export async function generateAssessmentPdf(input: AssessmentPdfInput): Promise<
   const regular = await doc.embedFont(StandardFonts.Helvetica);
   const bold = await doc.embedFont(StandardFonts.HelveticaBold);
   const italic = await doc.embedFont(StandardFonts.HelveticaOblique);
+  const symbol = await doc.embedFont(StandardFonts.Symbol);
+  const rich: RichFonts = { regular, symbol };
   const logo = input.schoolLogo?.length
     ? input.schoolLogo[0] === 0x89
       ? await doc.embedPng(input.schoolLogo)
@@ -175,15 +178,16 @@ export async function generateAssessmentPdf(input: AssessmentPdfInput): Promise<
 
     // Enunciado.
     const statement = q.statement?.trim() || "(enunciado não preenchido)";
-    const stLines = wrapLines(regular, fs, statement, textW);
+    // Enunciado com fórmulas (expoente, fração, raiz, símbolos).
+    const stLines = layoutRich(statement, { fonts: rich, size: fs, maxWidth: textW, lineHeight: cfg.lineHeight, justify: cfg.justify });
     stLines.forEach((line, i) => {
       pieces.push({
-        h: lh,
+        h: line.height,
         draw: (page, x, top) => {
           if (i === 0 && cfg.questionHeading === "inline") {
-            drawTextTop(page, `${number}.`, { x, top, size: fs, font: bold, color: BRAND.dark });
+            drawTextTop(page, `${number}.`, { x, top: top + line.baseline - fs * 0.8, size: fs, font: bold, color: BRAND.dark });
           }
-          drawLine(page, line, { x: x + indent, top, size: fs, font: regular, width: textW, justify: cfg.justify });
+          line.draw(page, x + indent, top);
         },
       });
     });
@@ -243,13 +247,14 @@ export async function generateAssessmentPdf(input: AssessmentPdfInput): Promise<
     if (q.type === "multiple_choice") {
       const optIndent = fs * 2.2;
       for (const opt of q.options) {
-        const lines = wrapLines(regular, fs, opt.text, textW - optIndent);
+        const lines = layoutRich(opt.text, { fonts: rich, size: fs, maxWidth: textW - optIndent, lineHeight: cfg.lineHeight, justify: cfg.justify });
         lines.forEach((line, i) => {
           pieces.push({
-            h: lh,
+            h: line.height,
             draw: (page, x, top) => {
-              if (i === 0) drawTextTop(page, `(${opt.label})`, { x: x + indent, top, size: fs, font: bold, color: BRAND.mid });
-              drawLine(page, line, { x: x + indent + optIndent, top, size: fs, font: regular, width: textW - optIndent, justify: cfg.justify });
+              // rótulo alinhado à linha de base do texto (que pode ser mais alta por causa de fração)
+              if (i === 0) drawTextTop(page, `(${opt.label})`, { x: x + indent, top: top + line.baseline - fs * 0.8, size: fs, font: bold, color: BRAND.mid });
+              line.draw(page, x + indent + optIndent, top);
             },
           });
         });
@@ -258,7 +263,7 @@ export async function generateAssessmentPdf(input: AssessmentPdfInput): Promise<
       pieces.push({
         h: lh * 1.2,
         draw: (page, x, top) => {
-          drawTextTop(page, "(     ) Verdadeiro          (     ) Falso", { x: x + indent, top: top + 2, size: fs, font: regular });
+          drawTextTop(page, "(     ) Certo          (     ) Errado", { x: x + indent, top: top + 2, size: fs, font: regular });
         },
       });
     } else {

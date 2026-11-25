@@ -33,8 +33,32 @@ export function sampleQuestions(count = 14): AssessmentQuestion[] {
     const kind = i % 7;
     if (kind === 3) {
       out.push({
-        position: i, type: "true_false", weight: 1, annulled: false, options: [], correct_answers: ["V"],
+        position: i, type: "true_false", weight: 1, annulled: false, options: [], correct_answers: ["C"],
         statement: "A função f(x) = 2x + 3 é crescente para todo número real x.",
+      });
+    } else if (kind === 4) {
+      out.push({
+        position: i, type: "multiple_choice", weight: 1, annulled: false, correct_answers: ["C"],
+        statement: "O valor da expressão \\frac{3}{4} + \\frac{1}{2} \\cdot \\sqrt{16} - 2^{3} \\div 4 é:",
+        options: [
+          { label: "A", text: "\\frac{1}{4}" },
+          { label: "B", text: "\\frac{3}{2}" },
+          { label: "C", text: "\\frac{3}{4}" },
+          { label: "D", text: "2^{-1}" },
+          { label: "E", text: "\\sqrt[3]{8}" },
+        ],
+      });
+    } else if (kind === 6) {
+      out.push({
+        position: i, type: "multiple_choice", weight: 1, annulled: false, correct_answers: ["B"],
+        statement: "As raízes da equação x^{2} - 5x + 6 = 0 são x_{1} e x_{2}. Sabendo que x_{1} < x_{2}, o valor de (x_{2})^{2} - x_{1} \\cdot π é aproximadamente (use π ≈ 3,14 e θ ≤ 90°):",
+        options: [
+          { label: "A", text: "x = \\frac{-b \\pm \\sqrt{b^{2} - 4ac}}{2a}" },
+          { label: "B", text: "2,72" },
+          { label: "C", text: "9 - 2π" },
+          { label: "D", text: "\\frac{9}{2}" },
+          { label: "E", text: "Nenhuma das anteriores" },
+        ],
       });
     } else if (kind === 5) {
       out.push({

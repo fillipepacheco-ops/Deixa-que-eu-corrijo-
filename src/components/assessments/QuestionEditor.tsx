@@ -1,7 +1,11 @@
 "use client";
 
-import { useActionState, useState } from "react";
-import { ArrowDown, ArrowUp, Copy, Trash2 } from "lucide-react";
+import { useActionState, useRef, useState } from "react";
+import { ArrowDown, ArrowUp, Copy, Sigma, Trash2 } from "lucide-react";
+import { MathField } from "@/components/math/MathField";
+import { FormulaPalette } from "@/components/math/FormulaPalette";
+import type { TextField } from "@/components/math/math-field";
+import { mathToPlain, parseMath } from "@/lib/math/parse";
 import type { AssessmentQuestion, QuestionType } from "@/lib/models/types";
 import { OPTION_LABELS, QUESTION_TYPE_NAMES } from "@/lib/assessment/question-form";
 import { QUESTION_LABEL } from "@/lib/assessment/header";
@@ -13,7 +17,7 @@ type State = { error?: string; ok?: boolean };
 function answerSummary(q: AssessmentQuestion): { text: string; missing: boolean } {
   if (q.type === "essay") return { text: "Correção manual", missing: false };
   if (!q.correct_answers.length) return { text: "Sem resposta no gabarito", missing: true };
-  if (q.type === "true_false") return { text: `Resposta: ${q.correct_answers[0] === "V" ? "Verdadeiro" : "Falso"}`, missing: false };
+  if (q.type === "true_false") return { text: `Resposta: ${q.correct_answers[0] === "C" ? "Certo" : "Errado"}`, missing: false };
   return { text: `Resposta: ${q.correct_answers.join(" ou ")}`, missing: false };
 }
 
@@ -45,6 +49,11 @@ export function QuestionEditor({
 }) {
   const [type, setType] = useState<QuestionType>(q.type);
   const [state, action] = useActionState<State, FormData>(save, {});
+  const [showFormulas, setShowFormulas] = useState(false);
+  const activeField = useRef<TextField | null>(null);
+  const track = (el: TextField) => {
+    activeField.current = el;
+  };
   const summary = answerSummary(q);
   const opts = OPTION_LABELS.map((label) => ({ label, text: q.options.find((o) => o.label === label)?.text ?? "" }));
 
@@ -53,7 +62,9 @@ export function QuestionEditor({
       <summary className="flex cursor-pointer list-none items-center gap-3 px-4 py-3.5 sm:px-5">
         <span className="rounded-lg bg-brand-900 px-2.5 py-1 text-[12px] font-extrabold tracking-wide text-white">{QUESTION_LABEL(number)}</span>
         <span className="min-w-0 flex-1">
-          <span className="block truncate text-[14px] font-medium text-ink">{q.statement || <em className="text-muted">Sem enunciado</em>}</span>
+          <span className="block truncate text-[14px] font-medium text-ink">
+            {q.statement ? mathToPlain(parseMath(q.statement)) : <em className="text-muted">Sem enunciado</em>}
+          </span>
           <span className="block text-[12px] text-muted">
             {QUESTION_TYPE_NAMES[q.type]} ·{" "}
             <span className={summary.missing ? "font-semibold text-amber-700" : ""}>{summary.text}</span>
@@ -82,12 +93,29 @@ export function QuestionEditor({
           </div>
 
           <div>
-            <label className="label">Enunciado</label>
-            <textarea
-              className="field min-h-32 text-justify leading-relaxed"
+            <div className="mb-1.5 flex items-end justify-between gap-2">
+              <label className="label mb-0">Enunciado</label>
+              <button
+                type="button"
+                onClick={() => setShowFormulas((v) => !v)}
+                className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-[13px] font-bold ${
+                  showFormulas ? "bg-brand-900 text-white" : "border border-brand-200 bg-white text-brand-900 hover:bg-brand-50"
+                }`}
+              >
+                <Sigma size={16} /> Fórmulas
+              </button>
+            </div>
+            {showFormulas && (
+              <div className="mb-2">
+                <FormulaPalette getTarget={() => activeField.current} />
+              </div>
+            )}
+            <MathField
               name="statement"
+              multiline
               defaultValue={q.statement}
-              placeholder="Digite o enunciado. Use Enter para separar parágrafos."
+              placeholder="Digite ou cole o enunciado (do Word, de sites ou de PDFs: expoentes, frações e raízes são reconhecidos). Enter separa parágrafos."
+              onFocusField={track}
             />
           </div>
 
@@ -96,12 +124,17 @@ export function QuestionEditor({
               <label className="label">Alternativas — marque a(s) correta(s)</label>
               <div className="space-y-2">
                 {opts.map((o) => (
-                  <div key={o.label} className="flex items-center gap-2">
+                  <div key={o.label} className="flex items-start gap-2">
                     <label className="flex shrink-0 cursor-pointer items-center gap-1.5 rounded-lg border border-line px-2.5 py-2 has-[:checked]:border-brand-500 has-[:checked]:bg-brand-50">
                       <input type="checkbox" name="correct" value={o.label} defaultChecked={q.correct_answers.includes(o.label)} className="h-4 w-4 accent-[#137a1a]" />
                       <span className="w-4 text-center font-extrabold text-brand-700">{o.label}</span>
                     </label>
-                    <input className="field" name={`opt_${o.label}`} defaultValue={o.text} placeholder={o.label === "E" ? "Opcional" : `Alternativa ${o.label}`} />
+                    <MathField
+                      name={`opt_${o.label}`}
+                      defaultValue={o.text}
+                      placeholder={o.label === "E" ? "Opcional" : `Alternativa ${o.label}`}
+                      onFocusField={track}
+                    />
                   </div>
                 ))}
               </div>
@@ -114,8 +147,8 @@ export function QuestionEditor({
               <label className="label">Resposta correta</label>
               <div className="flex gap-2">
                 {[
-                  ["V", "Verdadeiro"],
-                  ["F", "Falso"],
+                  ["C", "Certo"],
+                  ["E", "Errado"],
                 ].map(([v, l]) => (
                   <label key={v} className="flex cursor-pointer items-center gap-2 rounded-lg border border-line px-3 py-2 has-[:checked]:border-brand-500 has-[:checked]:bg-brand-50">
                     <input type="radio" name="correct_tf" value={v} defaultChecked={q.correct_answers[0] === v} className="accent-[#137a1a]" />

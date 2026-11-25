@@ -5,7 +5,7 @@
  * gamificada): uma única regra de nota para o sistema inteiro.
  *
  * Convenção para a resposta lida de uma questão:
- *   "A" | "B" | ... | "V" | "F" | texto  → resposta marcada
+ *   "A" | "B" | ... | "C"/"E" (certo/errado) | texto  → resposta marcada
  *   null / undefined                      → em branco
  *   "*"                                   → mais de uma marcação (dupla marcação)
  *   "?"                                   → leitura incerta (exige revisão do professor)

@@ -34,7 +34,9 @@ const COLUMN_PITCH = 45;
 
 export interface SheetQuestionSpec {
   number: number; // número da questão na prova
-  labels: string[]; // ["A","B","C","D"] ou ["V","F"]
+  labels: string[]; // ["A","B","C","D"] ou ["C","E"] (certo ou errado)
+  /** Questão certo/errado: a letra vai dentro da bolha. */
+  certoErrado?: boolean;
 }
 
 export interface Bubble {
@@ -43,6 +45,8 @@ export interface Bubble {
   x: number;
   y: number;
   r: number;
+  /** Letra impressa dentro da bolha (questões certo/errado). */
+  inner?: boolean;
 }
 
 export interface CodeCell {
@@ -122,13 +126,13 @@ export function sheetLayout(questions: SheetQuestionSpec[]): SheetLayout {
     const y = GRID_TOP + row * ROW_PITCH;
     questionLabels.push({ number: q.number, x: baseX, y });
     q.labels.forEach((label, j) => {
-      bubbles.push({ question: q.number, label, x: baseX + 9 + j * OPTION_PITCH, y, r: BUBBLE_R });
+      bubbles.push({ question: q.number, label, x: baseX + 9 + j * OPTION_PITCH, y, r: BUBBLE_R, inner: q.certoErrado });
     });
   });
 
   const columns = Math.ceil(questions.length / ROWS_PER_COLUMN);
-  // Cabeçalho A–E só para múltipla escolha (V/F leva a letra dentro da bolha).
-  const mcMax = Math.max(0, ...questions.filter((q) => q.labels[0] !== "V").map((q) => q.labels.length));
+  // Cabeçalho A–E só para múltipla escolha (certo/errado leva a letra dentro da bolha).
+  const mcMax = Math.max(0, ...questions.filter((q) => !q.certoErrado).map((q) => q.labels.length));
   const headerLabels = "ABCDE".slice(0, mcMax).split("");
   for (let c = 0; c < columns; c++) {
     headerLabels.forEach((label, j) =>
@@ -150,7 +154,7 @@ export function sheetLayout(questions: SheetQuestionSpec[]): SheetLayout {
   };
 }
 
-/** Questões que vão para o cartão: só as objetivas (múltipla escolha e V/F). */
+/** Questões que vão para o cartão: só as objetivas (múltipla escolha e certo/errado). */
 export function sheetQuestionsFrom(
   questions: { position: number; type: string; options: { label: string }[] }[],
 ): SheetQuestionSpec[] {
@@ -159,6 +163,7 @@ export function sheetQuestionsFrom(
     .sort((a, b) => a.position - b.position)
     .map((q) => ({
       number: q.position,
-      labels: q.type === "true_false" ? ["V", "F"] : q.options.map((o) => o.label),
+      labels: q.type === "true_false" ? ["C", "E"] : q.options.map((o) => o.label),
+      ...(q.type === "true_false" ? { certoErrado: true } : {}),
     }));
 }

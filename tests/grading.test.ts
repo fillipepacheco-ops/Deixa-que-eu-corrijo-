@@ -81,18 +81,18 @@ test("correção manual resolve a questão incerta", () => {
 
 test("verdadeiro ou falso, resposta curta e discursiva", () => {
   const key: AnswerKeyItem[] = [
-    { number: 1, type: "true_false", accepted: ["V"], weight: 1, annulled: false },
+    { number: 1, type: "true_false", accepted: ["C"], weight: 1, annulled: false },
     { number: 2, type: "short_answer", accepted: ["Fotossíntese"], weight: 1, annulled: false },
     { number: 3, type: "essay", accepted: [], weight: 2, annulled: false },
   ];
-  const r1 = gradeSubmission(key, { 1: "V", 2: "  fotossintese " });
+  const r1 = gradeSubmission(key, { 1: "C", 2: "  fotossintese " });
   assert.equal(r1.questions[1].status, "correct");
   assert.equal(r1.questions[2].status, "pending_manual");
   assert.equal(r1.score, 5); // 2 de 4 até a discursiva ser corrigida
-  const r2 = gradeSubmission(key, { 1: "V", 2: "fotossintese" }, { manualPoints: { 3: 1.5 } });
+  const r2 = gradeSubmission(key, { 1: "C", 2: "fotossintese" }, { manualPoints: { 3: 1.5 } });
   assert.equal(r2.score, 8.75);
   // nota manual acima do peso é limitada
-  const r3 = gradeSubmission(key, { 1: "V", 2: "x" }, { manualPoints: { 3: 99 } });
+  const r3 = gradeSubmission(key, { 1: "C", 2: "x" }, { manualPoints: { 3: 99 } });
   assert.equal(r3.earnedPoints, 3);
 });
 

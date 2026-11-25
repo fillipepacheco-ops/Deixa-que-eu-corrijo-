@@ -93,8 +93,8 @@ test("formulário de questão: múltipla escolha re-rotula alternativas e manté
 test("formulário de questão: validações e outros tipos", () => {
   assert.equal(parseQuestionForm(form([["type", "multiple_choice"], ["opt_A", "só uma"]])).ok, false);
   assert.equal(parseQuestionForm(form([["type", "xyz"]])).ok, false);
-  const tf = parseQuestionForm(form([["type", "true_false"], ["correct_tf", "F"], ["annulled", "on"]]));
-  assert.ok(tf.ok && tf.data.correct_answers[0] === "F" && tf.data.annulled);
+  const tf = parseQuestionForm(form([["type", "true_false"], ["correct_tf", "E"], ["annulled", "on"]]));
+  assert.ok(tf.ok && tf.data.correct_answers[0] === "E" && tf.data.annulled);
   const sa = parseQuestionForm(form([["type", "short_answer"], ["expected", "fotossíntese; fotossintese"]]));
   assert.ok(sa.ok && sa.data.correct_answers.length === 2);
 });

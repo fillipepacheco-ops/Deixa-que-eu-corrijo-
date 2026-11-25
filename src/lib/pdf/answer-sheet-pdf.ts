@@ -142,8 +142,8 @@ export async function generateAnswerSheetsPdf(input: AnswerSheetInput): Promise<
     }
     for (const b of layout.bubbles) {
       page.drawCircle({ x: toX(b.x), y: toY(b.y), size: mm(b.r), borderColor: BRAND.ink, borderWidth: 0.8 });
-      // V/F: a letra fica dentro (as colunas A–E não se aplicam).
-      if (b.label === "V" || b.label === "F") {
+      // Certo/errado: a letra fica dentro (as colunas A–E não se aplicam).
+      if (b.inner) {
         const w = regular.widthOfTextAtSize(b.label, 6);
         drawTextTop(page, b.label, { x: toX(b.x) - w / 2, top: mm(b.y) - 2.4, size: 6, font: regular, color: rgb(0.7, 0.72, 0.71) });
       }

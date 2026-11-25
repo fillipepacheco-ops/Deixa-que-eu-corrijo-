@@ -8,7 +8,7 @@ export const OPTION_LABELS = ["A", "B", "C", "D", "E"] as const;
 
 export const QUESTION_TYPE_NAMES: Record<QuestionType, string> = {
   multiple_choice: "Múltipla escolha",
-  true_false: "Verdadeiro ou falso",
+  true_false: "Certo ou errado",
   short_answer: "Resposta curta",
   essay: "Discursiva",
 };
@@ -47,7 +47,7 @@ export function parseQuestionForm(form: FormLike): { ok: true; data: ParsedQuest
     correct = filled.map((o, i) => (marked.has(o.old) ? OPTION_LABELS[i] : null)).filter((x): x is (typeof OPTION_LABELS)[number] => !!x);
   } else if (type === "true_false") {
     const v = str(form.get("correct_tf"));
-    correct = v === "V" || v === "F" ? [v] : [];
+    correct = v === "C" || v === "E" ? [v] : [];
   } else if (type === "short_answer") {
     correct = str(form.get("expected"))
       .split(";")
