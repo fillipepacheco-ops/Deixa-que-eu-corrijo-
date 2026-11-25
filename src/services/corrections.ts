@@ -65,5 +65,6 @@ export async function saveCorrection(assessmentId: string, input: SaveCorrection
   revalidatePath(`/correcao/${assessmentId}`);
   revalidatePath("/correcao");
   revalidatePath("/dashboard");
+  revalidatePath("/resultados", "layout");
   return { ok: true, score: grade.score };
 }

@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, BarChart3 } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { loadAssessment, loadStudents } from "@/services/assessment-data";
 import { sheetQuestionsFrom } from "@/lib/answer-sheet/layout";
@@ -51,7 +51,12 @@ export default async function CorrigirPage({ params }: { params: Promise<{ id: s
         <ArrowLeft size={16} /> Correção
       </Link>
       <h1 className="mb-1 text-[24px] font-extrabold tracking-tight text-brand-900 sm:text-[28px]">{assessment.title}</h1>
-      <p className="mb-5 text-[14px] text-muted">{[assessment.class_name, `${specs.length} questões no cartão`].filter(Boolean).join(" · ")}</p>
+      <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
+        <p className="text-[14px] text-muted">{[assessment.class_name, `${specs.length} questões no cartão`].filter(Boolean).join(" · ")}</p>
+        <Link href={`/resultados/${id}`} className="inline-flex items-center gap-1.5 rounded-xl border border-line bg-white px-3 py-2 text-[13px] font-bold text-brand-900 hover:border-brand-200">
+          <BarChart3 size={16} /> Ver notas para o diário
+        </Link>
+      </div>
 
       {specs.length === 0 ? (
         <EmptyState title="Sem questões objetivas" text="Cadastre questões de múltipla escolha ou certo/errado para corrigir pelo cartão-resposta." />
