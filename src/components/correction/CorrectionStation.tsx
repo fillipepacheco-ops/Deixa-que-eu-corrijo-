@@ -2,9 +2,9 @@
 /* eslint-disable @next/next/no-img-element */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Camera, CheckCircle2, ImageUp, Loader2, RotateCcw, Save, ScanLine } from "lucide-react";
+import { Camera, CheckCircle2, ImageUp, Loader2, RotateCcw, Save } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
-import { gradeSubmission, formatScore, UNCERTAIN, type AnswerKeyItem, type GivenAnswer } from "@/lib/grading/grading";
+import { gradeSubmission, formatScore, UNCERTAIN, type AnswerKeyItem, type GivenAnswer, type GradeResult } from "@/lib/grading/grading";
 import type { SheetQuestionSpec } from "@/lib/answer-sheet/layout";
 import type { AnnulPolicy } from "@/lib/models/types";
 import type { ReadResult } from "@/lib/omr/reader";
@@ -31,30 +31,172 @@ interface Props {
   corrected: Record<string, number>; // aluno → nota já salva
 }
 
-type Phase =
-  | { k: "camera" }
-  | { k: "result"; photo: HTMLCanvasElement; read: ReadResult }
-  | { k: "saved"; name: string; score: number };
+interface Shot {
+  photo: HTMLCanvasElement;
+  read: ReadResult;
+}
+
+type Banner =
+  | { k: "saving"; name: string }
+  | { k: "saved"; name: string; score: number; proof: string; shot: Shot }
+  | { k: "already"; name: string; score: number; shot: Shot }
+  | null;
 
 const SCAN_EVERY_MS = 450;
 const DETECT_SIDE = 900; // leitura rápida durante a busca
 const PHOTO_SIDE = 1600; // foto guardada / leitura final
+const SAME_CARD_MS = 6000; // o mesmo cartão só é lido de novo depois de sair da frente da câmera
+
+function signal() {
+  try {
+    navigator.vibrate?.(80);
+    const Ctx = window.AudioContext ?? (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
+    const ctx = new Ctx();
+    const o = ctx.createOscillator();
+    const g = ctx.createGain();
+    o.frequency.value = 880;
+    g.gain.setValueAtTime(0.12, ctx.currentTime);
+    g.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.25);
+    o.connect(g).connect(ctx.destination);
+    o.start();
+    o.stop(ctx.currentTime + 0.25);
+    setTimeout(() => ctx.close().catch(() => {}), 500);
+  } catch {
+    /* sem som: tudo bem */
+  }
+}
+
+function markedOf(r: ReadResult) {
+  const m: Record<number, string[]> = {};
+  for (const q of r.questions) m[q.number] = Object.entries(q.fills).filter(([, f]) => f >= MARKED_MIN).map(([l]) => l);
+  return m;
+}
 
 export function CorrectionStation(props: Props) {
   const { answerKey, specs, students } = props;
   const video = useRef<HTMLVideoElement>(null);
   const work = useRef<HTMLCanvasElement | null>(null);
-  const [phase, setPhase] = useState<Phase>({ k: "camera" });
+  const busyRef = useRef(false);
+  const recent = useRef(new Map<number, number>()); // nº do cartão → última vez visto
+  const [mode, setMode] = useState<"camera" | "review">("camera");
+  const [review, setReview] = useState<Shot | null>(null);
+  const [banner, setBanner] = useState<Banner>(null);
   const [cameraError, setCameraError] = useState("");
   const [hint, setHint] = useState("Aponte a câmera para o cartão-resposta inteiro, com os 4 quadrados pretos aparecendo.");
   const [found, setFound] = useState(false);
   const [busy, setBusy] = useState(false);
   const [saveError, setSaveError] = useState("");
   const [corrected, setCorrected] = useState<Record<string, number>>(props.corrected);
+  const correctedRef = useRef(corrected);
+  correctedRef.current = corrected;
+
+  // ---------- regras ----------
+  const identify = useCallback(
+    (r: ReadResult): { id: string; source: "" | "code" | "roll" | "other-assessment" } => {
+      if (r.sheetNumber !== null) {
+        const sheet = props.sheets.find((s) => s.sheet_number === r.sheetNumber);
+        if (!sheet) return { id: "", source: "other-assessment" };
+        if (sheet.student_id) return { id: sheet.student_id, source: "code" };
+      }
+      if (r.rollNumber !== null) {
+        const st = students.find((s) => s.roll_number === r.rollNumber);
+        if (st) return { id: st.id, source: "roll" };
+      }
+      return { id: "", source: "" };
+    },
+    [props.sheets, students],
+  );
+
+  const gradeOf = useCallback(
+    (answers: Record<number, GivenAnswer>) => gradeSubmission(answerKey, answers, { maxScore: props.maxScore, annulPolicy: props.annulPolicy }),
+    [answerKey, props.maxScore, props.annulPolicy],
+  );
+
+  const proofOf = useCallback(
+    (shot: Shot, answers: Record<number, GivenAnswer>, grade: GradeResult, studentName: string) =>
+      buildProof({
+        photo: shot.photo,
+        homography: shot.read.homography!,
+        specs,
+        key: answerKey,
+        answers,
+        marked: markedOf(shot.read),
+        grade,
+        studentName,
+        assessmentTitle: props.assessmentTitle,
+        when: new Date(),
+      }).toDataURL("image/jpeg", 0.85),
+    [specs, answerKey, props.assessmentTitle],
+  );
+
+  /** Envia o comprovante e grava a nota no banco. Devolve a nota salva. */
+  const persist = useCallback(
+    async (shot: Shot, student: StationStudent, answers: Record<number, GivenAnswer>, proof: string) => {
+      const blob = await (await fetch(proof)).blob();
+      const supabase = createClient();
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      if (!user) throw new Error("Sessão expirada. Entre de novo.");
+      const path = `${user.id}/${props.assessmentId}/${student.id}-${Date.now()}.jpg`;
+      const { error } = await supabase.storage.from("answer-sheet-photos").upload(path, blob, { contentType: "image/jpeg" });
+      if (error) throw new Error(error.message);
+      const res = await saveCorrection(props.assessmentId, {
+        studentId: student.id,
+        sheetNumber: shot.read.sheetNumber,
+        answers: Object.fromEntries(Object.entries(answers).map(([k, v]) => [k, v ?? null])),
+        readDetails: shot.read.questions.map((q) => ({ n: q.number, fills: q.fills, conf: q.confidence })),
+        imagePath: path,
+      });
+      if (!res.ok) throw new Error(res.error);
+      setCorrected((c) => ({ ...c, [student.id]: res.score }));
+      return res.score;
+    },
+    [props.assessmentId],
+  );
+
+  /**
+   * Leitura segura (aluno identificado, nenhuma dúvida, ainda não corrigido)
+   * → salva sozinho e a câmera continua pronta para o próximo.
+   * Qualquer dúvida → tela de confirmação.
+   */
+  const handleShot = useCallback(
+    async (shot: Shot) => {
+      setSaveError("");
+      const ident = identify(shot.read);
+      const answers = { ...shot.read.answers };
+      const grade = gradeOf(answers);
+      const student = students.find((s) => s.id === ident.id);
+      if (!student || grade.needsReview || ident.source === "other-assessment") {
+        setBanner(null);
+        setReview(shot);
+        setMode("review");
+        return;
+      }
+      const before = correctedRef.current[student.id];
+      if (before !== undefined) {
+        setBanner({ k: "already", name: student.name, score: before, shot });
+        return;
+      }
+      setBanner({ k: "saving", name: student.name });
+      try {
+        const proof = proofOf(shot, answers, grade, student.name);
+        const score = await persist(shot, student, answers, proof);
+        signal();
+        setBanner({ k: "saved", name: student.name, score, proof, shot });
+      } catch (e) {
+        setBanner(null);
+        setSaveError(e instanceof Error ? e.message : "Não foi possível salvar.");
+        setReview(shot);
+        setMode("review");
+      }
+    },
+    [identify, gradeOf, students, proofOf, persist],
+  );
 
   // ---------- câmera ----------
   useEffect(() => {
-    if (phase.k !== "camera") return;
+    if (mode !== "camera") return;
     let stream: MediaStream | null = null;
     let stop = false;
     (async () => {
@@ -77,141 +219,115 @@ export function CorrectionStation(props: Props) {
       stop = true;
       stream?.getTracks().forEach((t) => t.stop());
     };
-  }, [phase.k]);
+  }, [mode]);
 
-  const handleShot = useCallback(
-    (source: HTMLVideoElement | HTMLImageElement) => {
+  const capture = useCallback(
+    (source: HTMLVideoElement | HTMLImageElement): Shot | null => {
       const photo = toCanvas(source, PHOTO_SIDE);
       const read = readCanvas(photo, specs);
-      if (!read.ok) {
-        setHint(read.error ?? "Não encontrei o cartão. Tente de novo.");
-        return false;
-      }
-      setSaveError("");
-      setPhase({ k: "result", photo, read });
-      return true;
+      if (!read.ok || !read.homography) return null;
+      if (read.sheetNumber !== null) recent.current.set(read.sheetNumber, Date.now());
+      return { photo, read };
     },
     [specs],
   );
 
-  // leitura automática: quando o cartão é encontrado em 2 quadros seguidos, fotografa
+  // leitura automática contínua
   useEffect(() => {
-    if (phase.k !== "camera") return;
+    if (mode !== "camera") return;
     let hits = 0;
-    const timer = setInterval(() => {
+    const timer = setInterval(async () => {
       const v = video.current;
-      if (!v || v.readyState < 2 || !v.videoWidth) return;
+      if (busyRef.current || !v || v.readyState < 2 || !v.videoWidth) return;
       work.current = toCanvas(v, DETECT_SIDE, work.current ?? undefined);
       const r = readCanvas(work.current, specs);
-      const good = r.ok && (r.sheetNumber !== null || r.rollNumber !== null);
       setFound(r.ok);
       if (!r.ok) {
         hits = 0;
         setHint("Procurando o cartão… enquadre os 4 quadrados pretos dos cantos.");
         return;
       }
-      if (!good) {
+      if (r.sheetNumber === null && r.rollNumber === null) {
         hits = 0;
         setHint("Cartão encontrado. Aproxime um pouco para ler o código do topo.");
         return;
       }
+      if (r.sheetNumber !== null) {
+        const last = recent.current.get(r.sheetNumber);
+        if (last && Date.now() - last < SAME_CARD_MS) {
+          // o cartão que acabou de ser lido continua na frente: não lê de novo
+          recent.current.set(r.sheetNumber, Date.now());
+          hits = 0;
+          setHint("Cartão já lido. Tire-o e coloque o próximo.");
+          return;
+        }
+      }
       hits++;
       setHint("Cartão encontrado! Segure firme…");
-      if (hits >= 2) handleShot(v);
+      if (hits < 2) return;
+      hits = 0;
+      busyRef.current = true;
+      try {
+        const shot = capture(v);
+        if (shot) await handleShot(shot);
+      } finally {
+        busyRef.current = false;
+      }
     }, SCAN_EVERY_MS);
     return () => clearInterval(timer);
-  }, [phase.k, specs, handleShot]);
+  }, [mode, specs, capture, handleShot]);
+
+  async function manualShot(source: HTMLVideoElement | HTMLImageElement) {
+    if (busyRef.current) return;
+    busyRef.current = true;
+    try {
+      const shot = capture(source);
+      if (!shot) {
+        setHint("Não encontrei os 4 quadrados pretos. Enquadre o cartão inteiro, com boa luz.");
+        return;
+      }
+      await handleShot(shot);
+    } finally {
+      busyRef.current = false;
+    }
+  }
 
   async function fromGallery(file: File | undefined) {
     if (!file) return;
     try {
-      const img = await loadImage(file);
-      if (!handleShot(img)) setHint("Não encontrei os 4 quadrados pretos nessa foto. Tire outra com o cartão inteiro.");
+      await manualShot(await loadImage(file));
     } catch (e) {
       setHint(e instanceof Error ? e.message : "Foto inválida.");
     }
   }
 
-  // ---------- resultado ----------
-  const result = phase.k === "result" ? phase : null;
-  const sheetStudent = useMemo(() => {
-    if (!result) return { id: "", source: "" };
-    const r = result.read;
-    if (r.sheetNumber !== null) {
-      const sheet = props.sheets.find((s) => s.sheet_number === r.sheetNumber);
-      if (!sheet) return { id: "", source: "other-assessment" };
-      if (sheet.student_id) return { id: sheet.student_id, source: "code" };
-    }
-    if (r.rollNumber !== null) {
-      const st = students.find((s) => s.roll_number === r.rollNumber);
-      if (st) return { id: st.id, source: "roll" };
-    }
-    return { id: "", source: "" };
-  }, [result, props.sheets, students]);
-
+  // ---------- confirmação (só quando há dúvida) ----------
+  const ident = useMemo(() => (review ? identify(review.read) : { id: "", source: "" as const }), [review, identify]);
   const [studentId, setStudentId] = useState("");
   const [answers, setAnswers] = useState<Record<number, GivenAnswer>>({});
   useEffect(() => {
-    if (!result) return;
-    setStudentId(sheetStudent.id);
-    setAnswers({ ...result.read.answers });
-  }, [result, sheetStudent.id]);
-
-  const grade = useMemo(
-    () => gradeSubmission(answerKey, answers, { maxScore: props.maxScore, annulPolicy: props.annulPolicy }),
-    [answerKey, answers, props.maxScore, props.annulPolicy],
-  );
-
-  const marked = useMemo(() => {
-    const m: Record<number, string[]> = {};
-    for (const q of result?.read.questions ?? []) m[q.number] = Object.entries(q.fills).filter(([, f]) => f >= MARKED_MIN).map(([l]) => l);
-    return m;
-  }, [result]);
-
+    if (!review) return;
+    setStudentId(ident.id);
+    setAnswers({ ...review.read.answers });
+  }, [review, ident.id]);
+  const grade = useMemo(() => gradeOf(answers), [gradeOf, answers]);
   const student = students.find((s) => s.id === studentId);
-  const proofUrl = useMemo(() => {
-    if (!result?.read.homography) return "";
-    const c = buildProof({
-      photo: result.photo,
-      homography: result.read.homography,
-      specs,
-      key: answerKey,
-      answers,
-      marked,
-      grade,
-      studentName: student?.name ?? "",
-      assessmentTitle: props.assessmentTitle,
-      when: new Date(),
-    });
-    return c.toDataURL("image/jpeg", 0.85);
-  }, [result, answers, grade, marked, student, specs, answerKey, props.assessmentTitle]);
-
+  const proofUrl = useMemo(
+    () => (review?.read.homography ? proofOf(review, answers, grade, student?.name ?? "") : ""),
+    [review, answers, grade, student, proofOf],
+  );
   const uncertain = grade.questions.filter((q) => q.status === "uncertain");
 
-  async function save() {
-    if (!result || !student) return;
+  async function saveReview() {
+    if (!review || !student) return;
     setBusy(true);
     setSaveError("");
     try {
-      const blob = await (await fetch(proofUrl)).blob();
-      const supabase = createClient();
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
-      if (!user) throw new Error("Sessão expirada. Entre de novo.");
-      const path = `${user.id}/${props.assessmentId}/${student.id}-${Date.now()}.jpg`;
-      const { error } = await supabase.storage.from("answer-sheet-photos").upload(path, blob, { contentType: "image/jpeg" });
-      if (error) throw new Error(error.message);
-      const res = await saveCorrection(props.assessmentId, {
-        studentId: student.id,
-        sheetNumber: result.read.sheetNumber,
-        answers: Object.fromEntries(Object.entries(answers).map(([k, v]) => [k, v ?? null])),
-        readDetails: result.read.questions.map((q) => ({ n: q.number, fills: q.fills, conf: q.confidence })),
-        imagePath: path,
-      });
-      if (!res.ok) throw new Error(res.error);
-      setCorrected((c) => ({ ...c, [student.id]: res.score }));
-      setPhase({ k: "saved", name: student.name, score: res.score });
+      const score = await persist(review, student, answers, proofUrl);
+      signal();
+      setBanner({ k: "saved", name: student.name, score, proof: proofUrl, shot: review });
+      setReview(null);
+      setMode("camera");
     } catch (e) {
       setSaveError(e instanceof Error ? e.message : "Não foi possível salvar.");
     } finally {
@@ -219,28 +335,17 @@ export function CorrectionStation(props: Props) {
     }
   }
 
-  const done = Object.keys(corrected).length;
-
-  // ---------- telas ----------
-  if (phase.k === "saved") {
-    return (
-      <div className="mx-auto max-w-md rounded-3xl border border-line bg-white p-8 text-center">
-        <CheckCircle2 size={56} className="mx-auto text-brand-500" />
-        <p className="mt-3 text-[15px] font-semibold text-muted">Correção salva com comprovante</p>
-        <p className="mt-1 text-2xl font-extrabold text-brand-900">{phase.name}</p>
-        <p className="mt-3 text-5xl font-extrabold tabular-nums text-brand-900">{formatScore(phase.score)}</p>
-        <p className="mt-4 text-[13px] text-muted">
-          {done} de {students.length} alunos corrigidos
-        </p>
-        <button onClick={() => setPhase({ k: "camera" })} className="mt-6 inline-flex w-full items-center justify-center gap-2 rounded-xl bg-brand-900 px-4 py-3.5 text-[15px] font-bold text-white active:scale-[0.98]">
-          <ScanLine size={20} /> Próximo cartão
-        </button>
-      </div>
-    );
+  function openReview(shot: Shot) {
+    setBanner(null);
+    setSaveError("");
+    setReview(shot);
+    setMode("review");
   }
 
-  if (result) {
-    const r = result.read;
+  const done = Object.keys(corrected).length;
+
+  if (mode === "review" && review) {
+    const r = review.read;
     const already = studentId && corrected[studentId] !== undefined;
     return (
       <div className="grid gap-5 lg:grid-cols-[1fr_360px]">
@@ -273,12 +378,16 @@ export function CorrectionStation(props: Props) {
               ))}
             </select>
             <p className="mt-1.5 text-[12px] text-muted">
-              {sheetStudent.source === "code" && "Identificado pelo código do cartão."}
-              {sheetStudent.source === "roll" && `Identificado pelo nº de chamada (${r.rollNumber}).`}
-              {sheetStudent.source === "other-assessment" && <span className="font-semibold text-red-700">Atenção: este cartão é de outra avaliação.</span>}
-              {sheetStudent.source === "" && "Não foi possível identificar o aluno pelo cartão. Escolha na lista."}
+              {ident.source === "code" && "Identificado pelo código do cartão."}
+              {ident.source === "roll" && `Identificado pelo nº de chamada (${r.rollNumber}).`}
+              {ident.source === "other-assessment" && <span className="font-semibold text-red-700">Atenção: este cartão é de outra avaliação.</span>}
+              {ident.source === "" && "Não foi possível identificar o aluno pelo cartão. Escolha na lista."}
             </p>
-            {already && <p className="mt-2 rounded-lg bg-amber-50 px-3 py-2 text-[12px] text-amber-900">Este aluno já tem correção (nota {formatScore(corrected[studentId])}). Salvar vai substituir.</p>}
+            {already && (
+              <p className="mt-2 rounded-lg bg-amber-50 px-3 py-2 text-[12px] text-amber-900">
+                Este aluno já tem correção (nota {formatScore(corrected[studentId])}). Salvar vai substituir.
+              </p>
+            )}
           </div>
 
           {uncertain.length > 0 && (
@@ -307,51 +416,34 @@ export function CorrectionStation(props: Props) {
             </div>
           )}
 
-          <div className="rounded-2xl border border-line bg-white p-4">
-            <p className="mb-2 text-[13px] font-bold text-brand-900">Questão por questão</p>
-            <div className="grid grid-cols-5 gap-1.5 sm:grid-cols-6 lg:grid-cols-5">
-              {grade.questions
-                .filter((q) => specs.some((s) => s.number === q.number))
-                .map((q) => {
-                  const cls =
-                    q.status === "correct"
-                      ? "bg-green-100 text-green-800 border-green-300"
-                      : q.status === "uncertain"
-                        ? "bg-amber-100 text-amber-900 border-amber-300"
-                        : q.status === "annulled"
-                          ? "bg-gray-100 text-gray-500 border-gray-200"
-                          : "bg-red-100 text-red-800 border-red-300";
-                  const k = answerKey.find((x) => x.number === q.number);
-                  const given = q.given === null || q.given === undefined ? "–" : q.given === UNCERTAIN ? "?" : q.given === "*" ? "2+" : q.given;
-                  return (
-                    <div key={q.number} className={`rounded-lg border px-1 py-1 text-center ${cls}`} title={`Gabarito: ${k?.accepted.join("/") || "—"}`}>
-                      <p className="text-[10px] font-semibold opacity-70">{String(q.number).padStart(2, "0")}</p>
-                      <p className="text-[14px] font-extrabold">{given}</p>
-                    </div>
-                  );
-                })}
-            </div>
-            <p className="mt-2 text-[11px] text-muted">Verde: certa · Vermelho: errada ou em branco (na foto, o contorno tracejado verde mostra a resposta certa).</p>
-          </div>
+          <QuestionGrid grade={grade} specs={specs} answerKey={answerKey} />
 
-          {r.problems.filter((p) => !p.startsWith("Não foi possível identificar com segurança")).map((p) => (
-            <p key={p} className="rounded-lg bg-amber-50 px-3 py-2 text-[12px] text-amber-900">{p}</p>
-          ))}
+          {r.problems
+            .filter((p) => !p.startsWith("Não foi possível identificar com segurança"))
+            .map((p) => (
+              <p key={p} className="rounded-lg bg-amber-50 px-3 py-2 text-[12px] text-amber-900">
+                {p}
+              </p>
+            ))}
           {saveError && <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-800">{saveError}</p>}
 
           <button
-            onClick={save}
-            disabled={busy || !student || uncertain.length > 0 || sheetStudent.source === "other-assessment"}
+            onClick={saveReview}
+            disabled={busy || !student || uncertain.length > 0 || ident.source === "other-assessment"}
             className="flex w-full items-center justify-center gap-2 rounded-xl bg-brand-900 px-4 py-3.5 text-[15px] font-bold text-white disabled:opacity-50 active:scale-[0.98]"
           >
             {busy ? <Loader2 size={20} className="animate-spin" /> : <Save size={20} />}
             {busy ? "Salvando…" : !student ? "Escolha o aluno para salvar" : uncertain.length ? "Confirme as questões em amarelo" : "Salvar correção"}
           </button>
           <button
-            onClick={() => setPhase({ k: "camera" })}
+            onClick={() => {
+              setReview(null);
+              setSaveError("");
+              setMode("camera");
+            }}
             className="flex w-full items-center justify-center gap-2 rounded-xl border border-line bg-white px-4 py-3 text-[14px] font-semibold text-brand-900"
           >
-            <RotateCcw size={18} /> Fotografar de novo
+            <RotateCcw size={18} /> Voltar para a câmera
           </button>
         </aside>
       </div>
@@ -363,7 +455,6 @@ export function CorrectionStation(props: Props) {
     <div className="mx-auto max-w-2xl">
       <div className="relative overflow-hidden rounded-3xl bg-black">
         <video ref={video} playsInline muted autoPlay className="block aspect-[3/4] w-full object-cover" />
-        {/* guia de enquadramento */}
         <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
           <div className={`relative aspect-[210/297] h-[88%] rounded-xl border-2 ${found ? "border-green-400" : "border-white/70"} transition-colors`}>
             {["left-1 top-1", "right-1 top-1", "left-1 bottom-1", "right-1 bottom-1"].map((pos) => (
@@ -371,13 +462,55 @@ export function CorrectionStation(props: Props) {
             ))}
           </div>
         </div>
+
+        {banner && (
+          <div
+            className={`absolute inset-x-3 top-3 rounded-2xl px-4 py-3 shadow-lg ${
+              banner.k === "saved" ? "bg-green-600 text-white" : banner.k === "already" ? "bg-amber-500 text-white" : "bg-white/95 text-brand-900"
+            }`}
+          >
+            {banner.k === "saving" && (
+              <p className="flex items-center gap-2 text-[15px] font-bold">
+                <Loader2 size={20} className="animate-spin" /> Corrigindo e salvando — {banner.name}…
+              </p>
+            )}
+            {banner.k === "saved" && (
+              <div className="flex items-center gap-3">
+                <img src={banner.proof} alt="" className="h-16 w-12 shrink-0 rounded-md bg-white object-cover object-top" />
+                <div className="min-w-0 flex-1">
+                  <p className="flex items-center gap-1.5 text-[13px] font-semibold opacity-90">
+                    <CheckCircle2 size={16} /> Gabarito corrigido e salvo
+                  </p>
+                  <p className="truncate text-[17px] font-extrabold">{banner.name}</p>
+                  <p className="text-[13px] font-semibold">Pode ler o próximo cartão</p>
+                </div>
+                <div className="text-right">
+                  <p className="text-[11px] font-bold uppercase opacity-80">Nota</p>
+                  <p className="text-3xl font-extrabold tabular-nums">{formatScore(banner.score)}</p>
+                </div>
+              </div>
+            )}
+            {banner.k === "already" && (
+              <div className="flex items-center justify-between gap-3">
+                <div className="min-w-0">
+                  <p className="truncate text-[15px] font-extrabold">{banner.name} já foi corrigido(a)</p>
+                  <p className="text-[13px] font-semibold">Nota {formatScore(banner.score)} · pode ler o próximo</p>
+                </div>
+                <button type="button" onClick={() => openReview(banner.shot)} className="shrink-0 rounded-lg bg-white px-3 py-2 text-[13px] font-bold text-amber-700">
+                  Corrigir de novo
+                </button>
+              </div>
+            )}
+          </div>
+        )}
+
         <p className="absolute inset-x-3 bottom-3 rounded-xl bg-black/60 px-3 py-2 text-center text-[13px] font-semibold text-white backdrop-blur">{hint}</p>
       </div>
       {cameraError && <p className="mt-3 rounded-xl bg-red-50 px-4 py-3 text-sm text-red-800">{cameraError}</p>}
 
       <div className="mt-4 grid grid-cols-2 gap-3">
         <button
-          onClick={() => video.current && !handleShot(video.current) && setHint("Não encontrei os 4 quadrados pretos. Enquadre o cartão inteiro.")}
+          onClick={() => video.current && manualShot(video.current)}
           className="flex items-center justify-center gap-2 rounded-xl bg-brand-900 px-4 py-3.5 text-[15px] font-bold text-white active:scale-[0.98]"
         >
           <Camera size={20} /> Fotografar agora
@@ -387,9 +520,48 @@ export function CorrectionStation(props: Props) {
           <input type="file" accept="image/*" className="hidden" onChange={(e) => fromGallery(e.target.files?.[0])} />
         </label>
       </div>
+      {banner?.k === "saved" && (
+        <button type="button" onClick={() => openReview(banner.shot)} className="mt-3 w-full text-center text-[13px] font-semibold text-brand-700 underline">
+          Algo errado na última correção? Revisar
+        </button>
+      )}
       <p className="mt-3 text-center text-[13px] text-muted">
-        A leitura é automática: quando o cartão aparece inteiro, o app fotografa sozinho. · {done} de {students.length} corrigidos
+        Quando a leitura é segura, o app corrige e salva sozinho. Se houver dúvida, ele pede sua confirmação. ·{" "}
+        <strong>
+          {done} de {students.length} corrigidos
+        </strong>
       </p>
+    </div>
+  );
+}
+
+function QuestionGrid({ grade, specs, answerKey }: { grade: GradeResult; specs: SheetQuestionSpec[]; answerKey: AnswerKeyItem[] }) {
+  return (
+    <div className="rounded-2xl border border-line bg-white p-4">
+      <p className="mb-2 text-[13px] font-bold text-brand-900">Questão por questão</p>
+      <div className="grid grid-cols-5 gap-1.5 sm:grid-cols-6 lg:grid-cols-5">
+        {grade.questions
+          .filter((q) => specs.some((s) => s.number === q.number))
+          .map((q) => {
+            const cls =
+              q.status === "correct"
+                ? "bg-green-100 text-green-800 border-green-300"
+                : q.status === "uncertain"
+                  ? "bg-amber-100 text-amber-900 border-amber-300"
+                  : q.status === "annulled"
+                    ? "bg-gray-100 text-gray-500 border-gray-200"
+                    : "bg-red-100 text-red-800 border-red-300";
+            const k = answerKey.find((x) => x.number === q.number);
+            const given = q.given === null || q.given === undefined ? "–" : q.given === UNCERTAIN ? "?" : q.given === "*" ? "2+" : q.given;
+            return (
+              <div key={q.number} className={`rounded-lg border px-1 py-1 text-center ${cls}`} title={`Gabarito: ${k?.accepted.join("/") || "—"}`}>
+                <p className="text-[10px] font-semibold opacity-70">{String(q.number).padStart(2, "0")}</p>
+                <p className="text-[14px] font-extrabold">{given}</p>
+              </div>
+            );
+          })}
+      </div>
+      <p className="mt-2 text-[11px] text-muted">Verde: certa · Vermelho: errada ou em branco (na foto, o contorno tracejado verde mostra a resposta certa).</p>
     </div>
   );
 }
