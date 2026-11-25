@@ -71,7 +71,7 @@ function linesOfPage(items: Item[]): Line[] {
 }
 
 export async function extractPdf(pdfjs: PdfJs, data: ArrayBuffer): Promise<TextBlock[]> {
-  const task = pdfjs.getDocument({ data: new Uint8Array(data), isEvalSupported: false });
+  const task = pdfjs.getDocument({ data: new Uint8Array(data) });
   const doc = await task.promise;
   const pages: Line[][] = [];
   try {

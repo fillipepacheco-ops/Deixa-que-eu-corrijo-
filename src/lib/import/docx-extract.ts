@@ -211,7 +211,7 @@ export async function extractDocx(data: ArrayBuffer): Promise<DocxContent> {
       const ext = path.split(".").pop()?.toLowerCase() ?? "";
       const mime = ext === "png" ? "image/png" : ext === "jpg" || ext === "jpeg" ? "image/jpeg" : ext === "gif" ? "image/gif" : ext === "bmp" ? "image/bmp" : ext === "webp" ? "image/webp" : "";
       if (!mime) return; // EMF/WMF não abrem no navegador
-      images.set(path, new Blob([await f.async("uint8array")], { type: mime }));
+      images.set(path, new Blob([await f.async("arraybuffer")], { type: mime }));
     }),
   );
   for (const b of blocks) if (b.images) b.images = b.images.filter((i) => images.has(i));
