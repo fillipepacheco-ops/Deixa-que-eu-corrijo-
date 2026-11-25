@@ -18,7 +18,8 @@ import { ActionForm } from "@/components/ui/ActionForm";
 import { ConfirmButton } from "@/components/ui/ConfirmButton";
 import { HeaderFields } from "@/components/assessments/HeaderFields";
 import { QuestionEditor } from "@/components/assessments/QuestionEditor";
-import { formatDateBR } from "@/lib/assessment/header";
+import { FileButton } from "@/components/assessments/FileButton";
+import { fileSlug, formatDateBR } from "@/lib/assessment/header";
 import { QUESTION_TYPE_NAMES } from "@/lib/assessment/question-form";
 import type { QuestionType } from "@/lib/models/types";
 
@@ -26,27 +27,6 @@ export const metadata: Metadata = { title: "Avaliação" };
 
 const ADD_TYPES: QuestionType[] = ["multiple_choice", "true_false", "short_answer", "essay"];
 
-function DownloadButton({ href, icon: Icon, title, subtitle, disabled }: { href: string; icon: typeof FileText; title: string; subtitle: string; disabled?: string }) {
-  const inner = (
-    <>
-      <span className={`grid h-12 w-12 shrink-0 place-items-center rounded-2xl ${disabled ? "bg-brand-50 text-brand-700/40" : "bg-linear-to-br from-brand-700 to-brand-900 text-white"}`}>
-        <Icon size={24} />
-      </span>
-      <span className="min-w-0">
-        <span className="block font-bold text-brand-900">{title}</span>
-        <span className="block text-[12px] text-muted">{disabled ?? subtitle}</span>
-      </span>
-    </>
-  );
-  const cls = "flex items-center gap-3 rounded-2xl border border-line bg-white p-3.5";
-  return disabled ? (
-    <div className={`${cls} opacity-70`}>{inner}</div>
-  ) : (
-    <a href={href} target="_blank" rel="noopener" className={`${cls} transition hover:border-brand-200 hover:shadow-md active:scale-[0.98]`}>
-      {inner}
-    </a>
-  );
-}
 
 export default async function AvaliacaoPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -62,6 +42,7 @@ export default async function AvaliacaoPage({ params }: { params: Promise<{ id: 
 
   const objective = questions.filter((q) => q.type === "multiple_choice" || q.type === "true_false");
   const noQuestions = questions.length === 0 ? "Adicione questões primeiro" : undefined;
+  const slug = fileSlug(assessment.title);
 
   return (
     <>
@@ -78,18 +59,38 @@ export default async function AvaliacaoPage({ params }: { params: Promise<{ id: 
 
       {/* Arquivos gerados a partir da mesma informação */}
       <section className="mb-7 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-        <DownloadButton
+        <FileButton
           href={`/api/avaliacoes/${id}/pdf?modo=alunos`}
-          icon={Users}
+          filename={`${slug}-por-aluno.pdf`}
+          mime="application/pdf"
+          icon={<Users size={24} />}
           title="Provas por aluno (PDF)"
           subtitle={`${students.length} provas com nome e nº na capa`}
           disabled={noQuestions ?? (students.length === 0 ? "Escolha uma turma com alunos" : undefined)}
         />
-        <DownloadButton href={`/api/avaliacoes/${id}/pdf?modo=branco`} icon={FileDown} title="Prova em branco (PDF)" subtitle="Nome do aluno em branco" disabled={noQuestions} />
-        <DownloadButton href={`/api/avaliacoes/${id}/docx`} icon={FileText} title="Prova no Word" subtitle="Arquivo editável (.docx)" disabled={noQuestions} />
-        <DownloadButton
+        <FileButton
+          href={`/api/avaliacoes/${id}/pdf?modo=branco`}
+          filename={`${slug}.pdf`}
+          mime="application/pdf"
+          icon={<FileDown size={24} />}
+          title="Prova em branco (PDF)"
+          subtitle="Nome do aluno em branco"
+          disabled={noQuestions}
+        />
+        <FileButton
+          href={`/api/avaliacoes/${id}/docx`}
+          filename={`${slug}.docx`}
+          mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+          icon={<FileText size={24} />}
+          title="Prova no Word"
+          subtitle="Arquivo editável (.docx)"
+          disabled={noQuestions}
+        />
+        <FileButton
           href={`/api/avaliacoes/${id}/cartoes`}
-          icon={ScanLine}
+          filename={`cartoes-${slug}.pdf`}
+          mime="application/pdf"
+          icon={<ScanLine size={24} />}
           title="Cartões-resposta"
           subtitle={assessment.class_name ? `Um por aluno da ${assessment.class_name}` : "Cartões em branco"}
           disabled={objective.length === 0 ? "Precisa de questão objetiva" : undefined}
