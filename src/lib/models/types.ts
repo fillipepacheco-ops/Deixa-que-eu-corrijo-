@@ -43,6 +43,8 @@ export interface AssessmentQuestion {
   weight: number;
   annulled: boolean;
   image?: { bytes: Uint8Array; kind: "png" | "jpg"; widthMm?: number } | null;
+  /** Caminho da imagem no Storage (bucket question-images). */
+  image_path?: string | null;
   table_data?: { rows: string[][] } | null;
 }
 

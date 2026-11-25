@@ -4,32 +4,7 @@
 import { useRef, useState } from "react";
 import { ImagePlus, Loader2, X } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
-
-/** Reduz a foto para no máximo 800 px e salva como JPEG (leve para PDF e Word). */
-async function toSmallJpeg(file: File): Promise<Blob> {
-  const url = URL.createObjectURL(file);
-  try {
-    const img = await new Promise<HTMLImageElement>((resolve, reject) => {
-      const i = new Image();
-      i.onload = () => resolve(i);
-      i.onerror = () => reject(new Error("Imagem inválida"));
-      i.src = url;
-    });
-    const scale = Math.min(1, 800 / Math.max(img.naturalWidth, img.naturalHeight));
-    const canvas = document.createElement("canvas");
-    canvas.width = Math.round(img.naturalWidth * scale);
-    canvas.height = Math.round(img.naturalHeight * scale);
-    const ctx = canvas.getContext("2d")!;
-    ctx.fillStyle = "#fff"; // PNG transparente vira fundo branco
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
-    ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-    return await new Promise<Blob>((resolve, reject) =>
-      canvas.toBlob((b) => (b ? resolve(b) : reject(new Error("Falha ao converter"))), "image/jpeg", 0.88),
-    );
-  } finally {
-    URL.revokeObjectURL(url);
-  }
-}
+import { toJpeg } from "@/components/upload/resize";
 
 /**
  * Logo da escola: o arquivo vai direto para o Storage do professor
@@ -47,7 +22,7 @@ export function LogoUpload({ initialPath, initialUrl }: { initialPath?: string |
     setError("");
     setBusy(true);
     try {
-      const jpeg = await toSmallJpeg(file);
+      const jpeg = await toJpeg(file, 800);
       const supabase = createClient();
       const {
         data: { user },

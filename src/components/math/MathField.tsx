@@ -20,6 +20,7 @@ export function MathField({
   placeholder,
   className = "",
   onFocusField,
+  onImagePaste,
 }: {
   name: string;
   defaultValue: string;
@@ -27,6 +28,8 @@ export function MathField({
   placeholder?: string;
   className?: string;
   onFocusField?: (el: TextField) => void;
+  /** Imagem colada (print, figura copiada): vira a imagem da questão. */
+  onImagePaste?: (file: File) => void;
 }) {
   const [value, setValue] = useState(defaultValue);
   const showPreview = hasMath(value) || SYMBOL_CHARS.test(value);
@@ -38,6 +41,14 @@ export function MathField({
     onFocus: (e: React.FocusEvent<TextField>) => onFocusField?.(e.currentTarget),
     onInput: (e: React.FormEvent<TextField>) => setValue(e.currentTarget.value),
     onPaste: (e: React.ClipboardEvent<TextField>) => {
+      const image = Array.from(e.clipboardData.files).find((f) => f.type.startsWith("image/"));
+      if (image && onImagePaste) {
+        onImagePaste(image);
+        if (!e.clipboardData.getData("text/plain").trim()) {
+          e.preventDefault();
+          return;
+        }
+      }
       const converted = clipboardToMarkup(e.clipboardData);
       if (converted === null) return; // deixa o navegador colar normalmente
       e.preventDefault();

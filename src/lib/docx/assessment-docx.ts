@@ -211,8 +211,10 @@ function questionBlocks(q: AssessmentQuestion, number: number): (Paragraph | Tab
 
   if (q.image) {
     const { width, height } = imageSize(q.image.bytes, q.image.kind);
+    // Mesmo ajuste do PDF: largura da coluna, até 7,5 cm de altura, sem ampliar além de 150 dpi.
     const maxPx = Math.min(Math.round(((q.image.widthMm ?? 120) / 25.4) * 96), Math.round((COL_W / 1440) * 96));
-    const scale = Math.min(1, maxPx / width, 380 / height);
+    const maxHpx = Math.round((75 / 25.4) * 96);
+    const scale = Math.min(96 / 150, maxPx / width, maxHpx / height);
     blocks.push(
       new Paragraph({
         ...keep,

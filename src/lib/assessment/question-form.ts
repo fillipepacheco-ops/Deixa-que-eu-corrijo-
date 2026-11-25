@@ -20,6 +20,7 @@ export interface ParsedQuestion {
   correct_answers: string[];
   weight: number;
   annulled: boolean;
+  image_path: string | null;
 }
 
 type FormLike = { get(name: string): FormDataEntryValue | null; getAll(name: string): FormDataEntryValue[] };
@@ -55,7 +56,8 @@ export function parseQuestionForm(form: FormLike): { ok: true; data: ParsedQuest
       .filter(Boolean);
   }
 
-  return { ok: true, data: { type, statement, options, correct_answers: correct, weight, annulled } };
+  const image_path = str(form.get("image_path")) || null;
+  return { ok: true, data: { type, statement, options, correct_answers: correct, weight, annulled, image_path } };
 }
 
 /** Questão nova, já com 5 alternativas vazias quando for múltipla escolha. */

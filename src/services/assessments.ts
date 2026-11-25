@@ -167,7 +167,7 @@ export async function duplicateQuestion(assessmentId: string, questionId: string
   const { supabase, rows } = await questionIds(assessmentId);
   const { data: q } = await supabase
     .from("assessment_questions")
-    .select("type, statement, options, correct_answers, weight, table_data")
+    .select("type, statement, options, correct_answers, weight, table_data, image_path")
     .eq("id", questionId)
     .maybeSingle();
   if (!q) return;

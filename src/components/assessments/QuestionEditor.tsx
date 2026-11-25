@@ -5,6 +5,7 @@ import { ArrowDown, ArrowUp, Copy, Sigma, Trash2 } from "lucide-react";
 import { MathField } from "@/components/math/MathField";
 import { FormulaPalette } from "@/components/math/FormulaPalette";
 import type { TextField } from "@/components/math/math-field";
+import { QuestionImage, type QuestionImageHandle } from "./QuestionImage";
 import { mathToPlain, parseMath } from "@/lib/math/parse";
 import type { AssessmentQuestion, QuestionType } from "@/lib/models/types";
 import { OPTION_LABELS, QUESTION_TYPE_NAMES } from "@/lib/assessment/question-form";
@@ -30,6 +31,7 @@ export function QuestionEditor({
   isFirst,
   isLast,
   defaultOpen,
+  imageUrl,
   save,
   remove,
   moveUp,
@@ -41,6 +43,7 @@ export function QuestionEditor({
   isFirst: boolean;
   isLast: boolean;
   defaultOpen: boolean;
+  imageUrl?: string | null;
   save: (state: State, formData: FormData) => Promise<State>;
   remove: () => Promise<void>;
   moveUp: () => Promise<void>;
@@ -51,6 +54,7 @@ export function QuestionEditor({
   const [state, action] = useActionState<State, FormData>(save, {});
   const [showFormulas, setShowFormulas] = useState(false);
   const activeField = useRef<TextField | null>(null);
+  const imageRef = useRef<QuestionImageHandle>(null);
   const track = (el: TextField) => {
     activeField.current = el;
   };
@@ -71,6 +75,7 @@ export function QuestionEditor({
             {q.weight !== 1 && ` · peso ${q.weight.toLocaleString("pt-BR")}`}
           </span>
         </span>
+        {q.image_path && <span className="rounded-full bg-brand-50 px-2 py-0.5 text-[11px] font-bold text-brand-700">imagem</span>}
         {q.annulled && <span className="rounded-full bg-red-50 px-2 py-0.5 text-[11px] font-bold uppercase text-red-700">Anulada</span>}
         <span className="text-[13px] font-semibold text-brand-700 group-open:hidden">Editar</span>
       </summary>
@@ -116,7 +121,13 @@ export function QuestionEditor({
               defaultValue={q.statement}
               placeholder="Digite ou cole o enunciado (do Word, de sites ou de PDFs: expoentes, frações e raízes são reconhecidos). Enter separa parágrafos."
               onFocusField={track}
+              onImagePaste={(f) => imageRef.current?.upload(f)}
             />
+          </div>
+
+          <div>
+            <label className="label">Imagem da questão</label>
+            <QuestionImage ref={imageRef} initialPath={q.image_path} initialUrl={imageUrl} />
           </div>
 
           {type === "multiple_choice" && (

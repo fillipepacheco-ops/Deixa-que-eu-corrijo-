@@ -4,7 +4,7 @@ import { notFound } from "next/navigation";
 import { ArrowLeft, Eye, FileDown, FileText, Plus, ScanLine, Trash2, Users } from "lucide-react";
 import { buttonClass } from "@/components/ui/button";
 import { createClient } from "@/lib/supabase/server";
-import { loadAssessment, loadStudents, schoolLogoUrl } from "@/services/assessment-data";
+import { loadAssessment, loadStudents, questionImageUrls, schoolLogoUrl } from "@/services/assessment-data";
 import {
   addQuestion,
   deleteAssessment,
@@ -35,10 +35,11 @@ export default async function AvaliacaoPage({ params }: { params: Promise<{ id: 
   const data = await loadAssessment(supabase, id);
   if (!data) notFound();
   const { row, assessment, questions } = data;
-  const [{ data: classes }, students, logoUrl] = await Promise.all([
+  const [{ data: classes }, students, logoUrl, imageUrls] = await Promise.all([
     supabase.from("classes").select("id, name").order("name"),
     loadStudents(supabase, row.class_id),
     schoolLogoUrl(supabase, row.school_logo_path),
+    questionImageUrls(supabase, questions),
   ]);
 
   const objective = questions.filter((q) => q.type === "multiple_choice" || q.type === "true_false");
@@ -120,12 +121,13 @@ export default async function AvaliacaoPage({ params }: { params: Promise<{ id: 
           <div className="space-y-3">
             {questions.map((q, i) => (
               <QuestionEditor
-                key={`${q.id}-${JSON.stringify([q.type, q.statement, q.options, q.correct_answers, q.weight, q.annulled])}`}
+                key={`${q.id}-${JSON.stringify([q.type, q.statement, q.options, q.correct_answers, q.weight, q.annulled, q.image_path])}`}
                 q={q}
                 number={i + 1}
                 isFirst={i === 0}
                 isLast={i === questions.length - 1}
                 defaultOpen={!q.statement}
+                imageUrl={q.image_path ? imageUrls[q.image_path] : null}
                 save={saveQuestion.bind(null, id, q.id!)}
                 remove={deleteQuestion.bind(null, id, q.id!)}
                 moveUp={moveQuestion.bind(null, id, q.id!, -1)}

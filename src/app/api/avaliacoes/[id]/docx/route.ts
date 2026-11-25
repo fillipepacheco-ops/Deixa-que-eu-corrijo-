@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { toArrayBuffer } from "@/lib/bytes";
 import { createClient } from "@/lib/supabase/server";
-import { loadAssessment, loadSchoolLogo } from "@/services/assessment-data";
+import { attachQuestionImages, loadAssessment, loadSchoolLogo } from "@/services/assessment-data";
 import { generateAssessmentDocx } from "@/lib/docx/assessment-docx";
 import { examHeader, fileSlug } from "@/lib/assessment/header";
 
@@ -12,6 +12,7 @@ export async function GET(_: Request, { params }: { params: Promise<{ id: string
   const supabase = await createClient();
   const data = await loadAssessment(supabase, id);
   if (!data) return NextResponse.json({ error: "Avaliação não encontrada." }, { status: 404 });
+  await attachQuestionImages(supabase, data.questions);
 
   const schoolLogo = await loadSchoolLogo(supabase, data.row.school_logo_path);
   const bytes = await generateAssessmentDocx(examHeader(data.assessment), data.questions, { schoolLogo });

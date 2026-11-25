@@ -29,6 +29,7 @@ export interface QuestionRow {
   weight: number;
   annulled: boolean;
   table_data: { rows: string[][] } | null;
+  image_path: string | null;
 }
 
 export function toAssessment(row: AssessmentRow): Assessment {
@@ -64,6 +65,7 @@ export function toQuestion(row: QuestionRow): AssessmentQuestion {
     annulled: row.annulled,
     table_data: row.table_data,
     image: null,
+    image_path: row.image_path,
   };
 }
 
@@ -77,7 +79,7 @@ export async function loadAssessment(supabase: SupabaseClient, id: string) {
   if (!row) return null;
   const { data: qs } = await supabase
     .from("assessment_questions")
-    .select("id, position, type, statement, options, correct_answers, weight, annulled, table_data")
+    .select("id, position, type, statement, options, correct_answers, weight, annulled, table_data, image_path")
     .eq("assessment_id", id)
     .order("position");
   return {
@@ -112,4 +114,28 @@ export async function loadStudents(supabase: SupabaseClient, classId: string | n
     .order("roll_number", { ascending: true, nullsFirst: false })
     .order("name");
   return (data ?? []) as { id: string; name: string; roll_number: number | null }[];
+}
+
+/** Baixa as imagens das questões (para gerar PDF/Word). */
+export async function attachQuestionImages(supabase: SupabaseClient, questions: AssessmentQuestion[]) {
+  await Promise.all(
+    questions.map(async (q) => {
+      if (!q.image_path) return;
+      const { data } = await supabase.storage.from("question-images").download(q.image_path);
+      if (!data) return;
+      const bytes = new Uint8Array(await data.arrayBuffer());
+      q.image = { bytes, kind: bytes[0] === 0x89 ? "png" : "jpg" };
+    }),
+  );
+  return questions;
+}
+
+/** Links temporários das imagens (para mostrar no editor). */
+export async function questionImageUrls(supabase: SupabaseClient, questions: AssessmentQuestion[]) {
+  const paths = questions.map((q) => q.image_path).filter((p): p is string => !!p);
+  if (!paths.length) return {} as Record<string, string>;
+  const { data } = await supabase.storage.from("question-images").createSignedUrls(paths, 60 * 60);
+  const out: Record<string, string> = {};
+  for (const d of data ?? []) if (d.path && d.signedUrl) out[d.path] = d.signedUrl;
+  return out;
 }

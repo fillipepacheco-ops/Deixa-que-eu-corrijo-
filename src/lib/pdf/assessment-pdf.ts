@@ -195,9 +195,11 @@ export async function generateAssessmentPdf(input: AssessmentPdfInput): Promise<
     // Imagem logo abaixo do enunciado.
     const img = images.get(q.position);
     if (img) {
+      // Ajuste automático: cabe na largura da coluna, no máximo 7,5 cm de altura
+      // e nunca maior que o tamanho natural da imagem (150 dpi) — não fica borrada.
       const maxW = Math.min(textW, q.image?.widthMm ? mm(q.image.widthMm) : textW);
-      const maxH = mm(90);
-      const scale = Math.min(maxW / img.width, maxH / img.height, 1.5);
+      const maxH = mm(75);
+      const scale = Math.min(maxW / img.width, maxH / img.height, 72 / 150);
       const w = img.width * scale;
       const h = img.height * scale;
       pieces.push({
