@@ -1,9 +1,9 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { ArrowLeft, FileDown, FileText, Plus, ScanLine, Trash2 } from "lucide-react";
+import { ArrowLeft, FileDown, FileText, Plus, ScanLine, Trash2, Users } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
-import { loadAssessment } from "@/services/assessment-data";
+import { loadAssessment, loadStudents, schoolLogoUrl } from "@/services/assessment-data";
 import {
   addQuestion,
   deleteAssessment,
@@ -54,7 +54,11 @@ export default async function AvaliacaoPage({ params }: { params: Promise<{ id: 
   const data = await loadAssessment(supabase, id);
   if (!data) notFound();
   const { row, assessment, questions } = data;
-  const { data: classes } = await supabase.from("classes").select("id, name").order("name");
+  const [{ data: classes }, students, logoUrl] = await Promise.all([
+    supabase.from("classes").select("id, name").order("name"),
+    loadStudents(supabase, row.class_id),
+    schoolLogoUrl(supabase, row.school_logo_path),
+  ]);
 
   const objective = questions.filter((q) => q.type === "multiple_choice" || q.type === "true_false");
   const noQuestions = questions.length === 0 ? "Adicione questões primeiro" : undefined;
@@ -65,7 +69,7 @@ export default async function AvaliacaoPage({ params }: { params: Promise<{ id: 
         <ArrowLeft size={16} /> Avaliações
       </Link>
       <PageHeader
-        eyebrow="Modelo larga escala · Arial 12 · justificado · espaçamento 1,5"
+        eyebrow="Larga escala · 2 colunas · Arial 12 · justificado · espaçamento 1,5"
         title={assessment.title}
         description={[assessment.subject, assessment.class_name, formatDateBR(assessment.applied_on), `${questions.length} ${questions.length === 1 ? "questão" : "questões"}`]
           .filter(Boolean)
@@ -73,8 +77,15 @@ export default async function AvaliacaoPage({ params }: { params: Promise<{ id: 
       />
 
       {/* Arquivos gerados a partir da mesma informação */}
-      <section className="mb-7 grid gap-3 sm:grid-cols-3">
-        <DownloadButton href={`/api/avaliacoes/${id}/pdf`} icon={FileDown} title="Prova em PDF" subtitle="Pronta para imprimir" disabled={noQuestions} />
+      <section className="mb-7 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+        <DownloadButton
+          href={`/api/avaliacoes/${id}/pdf?modo=alunos`}
+          icon={Users}
+          title="Provas por aluno (PDF)"
+          subtitle={`${students.length} provas com nome e nº na capa`}
+          disabled={noQuestions ?? (students.length === 0 ? "Escolha uma turma com alunos" : undefined)}
+        />
+        <DownloadButton href={`/api/avaliacoes/${id}/pdf?modo=branco`} icon={FileDown} title="Prova em branco (PDF)" subtitle="Nome do aluno em branco" disabled={noQuestions} />
         <DownloadButton href={`/api/avaliacoes/${id}/docx`} icon={FileText} title="Prova no Word" subtitle="Arquivo editável (.docx)" disabled={noQuestions} />
         <DownloadButton
           href={`/api/avaliacoes/${id}/cartoes`}
@@ -93,7 +104,7 @@ export default async function AvaliacaoPage({ params }: { params: Promise<{ id: 
               <p className="mt-2 text-[13px] text-muted">Os mesmos dados saem na capa da prova e nos cartões-resposta.</p>
               <div className="mt-4">
                 <ActionForm action={updateAssessment.bind(null, id)} submitLabel="Salvar cabeçalho" successText="Cabeçalho atualizado.">
-                  <HeaderFields classes={classes ?? []} value={{ ...row, max_score: Number(row.max_score) }} />
+                  <HeaderFields classes={classes ?? []} value={{ ...row, max_score: Number(row.max_score) }} logoUrl={logoUrl} />
                 </ActionForm>
               </div>
             </details>

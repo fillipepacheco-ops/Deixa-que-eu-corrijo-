@@ -18,7 +18,7 @@ import {
   LevelFormat,
   LineRuleType,
   Packer,
-  PageBreak,
+  SectionType,
   PageNumber,
   Paragraph,
   ShadingType,
@@ -46,6 +46,9 @@ const LIGHT = "F0F8EB";
 const PAGE_W = 11906;
 const MARGIN = 1134;
 const CONTENT_W = PAGE_W - 2 * MARGIN;
+// Questões em duas colunas (economia de papel), com 1 cm entre as colunas.
+const COL_GAP = 567;
+const COL_W = Math.floor((CONTENT_W - COL_GAP) / 2);
 
 const cellBorder = { style: BorderStyle.SINGLE, size: 4, color: "B8C2BC" };
 const borders = { top: cellBorder, bottom: cellBorder, left: cellBorder, right: cellBorder };
@@ -73,10 +76,32 @@ function row(cells: [string, string, number][]) {
   return new TableRow({ cantSplit: true, children: cells.map(([l, v, w]) => fieldCell(l, v, w)) });
 }
 
-function coverPage(h: ExamHeader): (Paragraph | Table)[] {
+export interface DocxOptions {
+  /** Logo da escola (JPEG ou PNG). */
+  schoolLogo?: Uint8Array | null;
+  /** Nome e nº do aluno já preenchidos na capa. */
+  student?: { name: string; rollNumber?: number | null } | null;
+}
+
+function coverPage(h: ExamHeader, opts: DocxOptions): (Paragraph | Table)[] {
   const half = Math.round(CONTENT_W / 2);
   const twoThirds = Math.round((CONTENT_W * 3) / 4);
   const out: (Paragraph | Table)[] = [];
+
+  if (opts.schoolLogo?.length) {
+    const kind = opts.schoolLogo[0] === 0x89 ? "png" : "jpg";
+    const { width, height } = imageSize(opts.schoolLogo, kind);
+    const sc = Math.min(83 / height, 265 / width); // até ~2,2 cm de altura e 7 cm de largura
+    out.push(
+      new Paragraph({
+        alignment: AlignmentType.CENTER,
+        spacing: { after: 120 },
+        children: [
+          new ImageRun({ type: kind, data: opts.schoolLogo, transformation: { width: Math.round(width * sc), height: Math.round(height * sc) } }),
+        ],
+      }),
+    );
+  }
 
   if (h.schoolName) {
     out.push(
@@ -112,8 +137,8 @@ function coverPage(h: ExamHeader): (Paragraph | Table)[] {
       columnWidths: [twoThirds, CONTENT_W - twoThirds],
       rows: [
         row([
-          ["Nome do(a) aluno(a)", "", twoThirds],
-          ["Nº", "", CONTENT_W - twoThirds],
+          ["Nome do(a) aluno(a)", opts.student?.name ?? "", twoThirds],
+          ["Nº", opts.student?.rollNumber ? String(opts.student.rollNumber) : "", CONTENT_W - twoThirds],
         ]),
       ],
     }),
@@ -155,7 +180,6 @@ function coverPage(h: ExamHeader): (Paragraph | Table)[] {
         new TextRun({ text: "AGUARDE A AUTORIZAÇÃO DO APLICADOR PARA INICIAR A PROVA.", bold: true, size: SIZE, color: DARK, font: FONT }),
       ],
     }),
-    new Paragraph({ children: [new PageBreak()] }),
   );
   return out;
 }
@@ -185,7 +209,7 @@ function questionBlocks(q: AssessmentQuestion, number: number): (Paragraph | Tab
 
   if (q.image) {
     const { width, height } = imageSize(q.image.bytes, q.image.kind);
-    const maxPx = Math.round(((q.image.widthMm ?? 120) / 25.4) * 96);
+    const maxPx = Math.min(Math.round(((q.image.widthMm ?? 120) / 25.4) * 96), Math.round((COL_W / 1440) * 96));
     const scale = Math.min(1, maxPx / width, 380 / height);
     blocks.push(
       new Paragraph({
@@ -206,11 +230,11 @@ function questionBlocks(q: AssessmentQuestion, number: number): (Paragraph | Tab
   if (q.table_data?.rows?.length) {
     const rows = q.table_data.rows;
     const ncols = Math.max(...rows.map((r) => r.length));
-    const colW = Math.floor(CONTENT_W / ncols);
-    const widths = Array.from({ length: ncols }, (_, i) => (i === ncols - 1 ? CONTENT_W - colW * (ncols - 1) : colW));
+    const colW = Math.floor(COL_W / ncols);
+    const widths = Array.from({ length: ncols }, (_, i) => (i === ncols - 1 ? COL_W - colW * (ncols - 1) : colW));
     blocks.push(
       new Table({
-        width: { size: CONTENT_W, type: WidthType.DXA },
+        width: { size: COL_W, type: WidthType.DXA },
         columnWidths: widths,
         rows: rows.map(
           (r, ri) =>
@@ -272,8 +296,8 @@ function questionBlocks(q: AssessmentQuestion, number: number): (Paragraph | Tab
     const line = { style: BorderStyle.SINGLE, size: 4, color: "B8C2BC" };
     blocks.push(
       new Table({
-        width: { size: CONTENT_W, type: WidthType.DXA },
-        columnWidths: [CONTENT_W],
+        width: { size: COL_W, type: WidthType.DXA },
+        columnWidths: [COL_W],
         borders: { top: none, bottom: none, left: none, right: none, insideHorizontal: none, insideVertical: none },
         rows: Array.from(
           { length: lines },
@@ -283,7 +307,7 @@ function questionBlocks(q: AssessmentQuestion, number: number): (Paragraph | Tab
               height: { value: 480, rule: HeightRule.EXACT },
               children: [
                 new TableCell({
-                  width: { size: CONTENT_W, type: WidthType.DXA },
+                  width: { size: COL_W, type: WidthType.DXA },
                   borders: { top: none, left: none, right: none, bottom: line },
                   children: [new Paragraph({ keepNext: true, children: [] })],
                 }),
@@ -296,7 +320,7 @@ function questionBlocks(q: AssessmentQuestion, number: number): (Paragraph | Tab
   return blocks;
 }
 
-export async function generateAssessmentDocx(header: ExamHeader, questions: AssessmentQuestion[]): Promise<Uint8Array> {
+export async function generateAssessmentDocx(header: ExamHeader, questions: AssessmentQuestion[], opts: DocxOptions = {}): Promise<Uint8Array> {
   const sorted = [...questions].sort((a, b) => a.position - b.position);
 
   const runningHeader = new Header({
@@ -306,7 +330,12 @@ export async function generateAssessmentDocx(header: ExamHeader, questions: Asse
         border: { bottom: { style: BorderStyle.SINGLE, size: 4, color: "B8C2BC", space: 4 } },
         children: [
           new TextRun({ text: header.title, bold: true, size: 16, color: MID, font: FONT }),
-          new TextRun({ text: "\tAluno(a): ________________________________", size: 16, color: GRAY, font: FONT }),
+          new TextRun({
+            text: `\tAluno(a): ${opts.student?.name ?? "________________________________"}`,
+            size: 16,
+            color: GRAY,
+            font: FONT,
+          }),
         ],
       }),
     ],
@@ -326,6 +355,11 @@ export async function generateAssessmentDocx(header: ExamHeader, questions: Asse
       }),
     ],
   });
+
+  const pageProps = {
+    size: { width: PAGE_W, height: 16838 },
+    margin: { top: MARGIN, bottom: MARGIN, left: MARGIN, right: MARGIN, header: 567, footer: 567 },
+  };
 
   const doc = new Document({
     creator: "Deixa que eu Corrijo",
@@ -352,17 +386,23 @@ export async function generateAssessmentDocx(header: ExamHeader, questions: Asse
       ],
     },
     sections: [
+      // 1) Capa: largura total, sem cabeçalho/rodapé.
+      {
+        properties: { page: pageProps },
+        headers: { default: new Header({ children: [new Paragraph({ children: [] })] }) },
+        footers: { default: new Footer({ children: [new Paragraph({ children: [] })] }) },
+        children: coverPage(header, opts),
+      },
+      // 2) Questões em duas colunas, começando na página seguinte.
       {
         properties: {
-          titlePage: true, // capa sem cabeçalho/rodapé
-          page: {
-            size: { width: PAGE_W, height: 16838 },
-            margin: { top: MARGIN, bottom: MARGIN, left: MARGIN, right: MARGIN, header: 567, footer: 567 },
-          },
+          type: SectionType.NEXT_PAGE,
+          page: pageProps,
+          column: { count: 2, space: COL_GAP, separate: true, equalWidth: true },
         },
-        headers: { default: runningHeader, first: new Header({ children: [new Paragraph({ children: [] })] }) },
-        footers: { default: footer, first: new Footer({ children: [new Paragraph({ children: [] })] }) },
-        children: [...coverPage(header), ...sorted.flatMap((q, i) => questionBlocks(q, i + 1))],
+        headers: { default: runningHeader },
+        footers: { default: footer },
+        children: sorted.flatMap((q, i) => questionBlocks(q, i + 1)),
       },
     ],
   });

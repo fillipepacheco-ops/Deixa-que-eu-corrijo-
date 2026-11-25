@@ -4,7 +4,9 @@ import JSZip from "jszip";
 import { generateAssessmentDocx } from "../src/lib/docx/assessment-docx";
 import { DEFAULT_INSTRUCTIONS, examHeader, fileSlug, parseInstructions } from "../src/lib/assessment/header";
 import { parseQuestionForm } from "../src/lib/assessment/question-form";
-import { generateAssessmentPdf } from "../src/lib/pdf/assessment-pdf";
+import { generateAssessmentPdf, generateExamCopiesPdf } from "../src/lib/pdf/assessment-pdf";
+import { PDFDocument } from "pdf-lib";
+import { readFileSync } from "node:fs";
 import { sampleAssessment, sampleQuestions } from "./fixtures/sample-assessment";
 
 function form(entries: [string, string][]) {
@@ -28,8 +30,29 @@ test("Word: Arial 12, justificado, espaçamento 1,5, capa e numeração QUESTÃO
   assert.match(xml, /INSTRUÇÕES/);
   assert.match(xml, /Escola de Exemplo|ESCOLA DE EXEMPLO/);
   assert.match(xml, /02\/12\/2026/);
-  assert.match(xml, /w:titlePg/); // capa sem cabeçalho/rodapé
+  assert.match(xml, /<w:cols[^>]*w:num="2"/); // questões em duas colunas
   for (const i of DEFAULT_INSTRUCTIONS) assert.ok(xml.includes(i.slice(0, 30)), "instrução padrão na capa");
+});
+
+test("Word personalizado: logo da escola e nome do aluno na capa", async () => {
+  const h = examHeader(sampleAssessment("larga_escala"));
+  const logo = new Uint8Array(readFileSync("tests/fixtures/logo-escola-exemplo.jpg"));
+  const bytes = await generateAssessmentDocx(h, sampleQuestions(2), { schoolLogo: logo, student: { name: "Ana Beatriz Souza", rollNumber: 1 } });
+  const zip = await JSZip.loadAsync(bytes);
+  const xml = await zip.file("word/document.xml")!.async("string");
+  assert.match(xml, /Ana Beatriz Souza/);
+  assert.ok(Object.keys(zip.files).some((f) => f.startsWith("word/media/")), "logo embutida");
+});
+
+test("PDF: uma prova por aluno, com nome na capa, num único arquivo", async () => {
+  const logo = new Uint8Array(readFileSync("tests/fixtures/logo-escola-exemplo.jpg"));
+  const one = await generateAssessmentPdf({ assessment: sampleAssessment("larga_escala"), questions: sampleQuestions(4), schoolLogo: logo });
+  const all = await generateExamCopiesPdf(
+    { assessment: sampleAssessment("larga_escala"), questions: sampleQuestions(4), schoolLogo: logo },
+    [{ name: "Ana", rollNumber: 1 }, { name: "João", rollNumber: 2 }, { name: "Maria", rollNumber: 3 }],
+  );
+  const doc = await PDFDocument.load(all.bytes);
+  assert.equal(doc.getPageCount(), one.pageCount * 3);
 });
 
 test("PDF larga escala: capa + questões a partir da página 2", async () => {

@@ -39,10 +39,11 @@ export const TEMPLATES: Record<Exclude<PdfTemplate, "personalizado">, TemplateCo
     questionHeading: "inline", showWeights: false, essayLines: 5,
     lineHeight: 1.38, justify: false, coverPage: false,
   },
-  // Padrão de larga escala: Arial/Helvetica 12, justificado, espaçamento 1,5,
-  // "QUESTÃO 01" e capa com cabeçalho (mesmos dados do cartão-resposta).
+  // Padrão de larga escala: duas colunas (economia de papel), Arial/Helvetica 12,
+  // justificado, espaçamento 1,5, "QUESTÃO 01" e capa com cabeçalho
+  // (mesmos dados do cartão-resposta).
   larga_escala: {
-    columns: 1, fontSize: 12, header: "band", showGradeBox: false, showSignature: false,
+    columns: 2, fontSize: 12, header: "band", showGradeBox: false, showSignature: false,
     questionHeading: "label", showWeights: true, essayLines: 6,
     lineHeight: 1.725, justify: true, coverPage: true,
   },
@@ -70,10 +71,19 @@ interface Piece {
   draw: (page: PDFPage, x: number, top: number) => void;
 }
 
+export interface ExamStudent {
+  name: string;
+  rollNumber?: number | null;
+}
+
 export interface AssessmentPdfInput {
   assessment: Assessment;
   questions: AssessmentQuestion[];
   customTemplate?: Partial<TemplateConfig>;
+  /** Logo da escola (JPEG ou PNG), no topo da capa. */
+  schoolLogo?: Uint8Array | null;
+  /** Prova personalizada: nome e nº do aluno já preenchidos. */
+  student?: ExamStudent | null;
 }
 
 export interface AssessmentPdfResult {
@@ -94,6 +104,12 @@ export async function generateAssessmentPdf(input: AssessmentPdfInput): Promise<
   const regular = await doc.embedFont(StandardFonts.Helvetica);
   const bold = await doc.embedFont(StandardFonts.HelveticaBold);
   const italic = await doc.embedFont(StandardFonts.HelveticaOblique);
+  const logo = input.schoolLogo?.length
+    ? input.schoolLogo[0] === 0x89
+      ? await doc.embedPng(input.schoolLogo)
+      : await doc.embedJpg(input.schoolLogo)
+    : null;
+  const student = input.student ?? null;
 
   const fs = cfg.fontSize;
   const lh = fs * cfg.lineHeight;
@@ -385,7 +401,16 @@ export async function generateAssessmentPdf(input: AssessmentPdfInput): Promise<
   /** Capa: mesmos dados do cartão-resposta + instruções numeradas. */
   function drawCover(p: PDFPage) {
     const h = examHeader(assessment);
-    let top = MARGIN_TOP + mm(4);
+    let top = MARGIN_TOP + mm(2);
+    if (logo) {
+      const maxH = mm(22);
+      const maxW = mm(70);
+      const sc = Math.min(maxH / logo.height, maxW / logo.width);
+      const w = logo.width * sc;
+      const lh2 = logo.height * sc;
+      p.drawImage(logo, { x: MARGIN_X + (contentW - w) / 2, y: A4.h - top - lh2, width: w, height: lh2 });
+      top += lh2 + mm(4);
+    }
     const center = (text: string, size: number, font = regular, color = BRAND.ink) => {
       for (const line of wrapText(font, size, text, contentW)) {
         const w = font.widthOfTextAtSize(line, size);
@@ -409,8 +434,8 @@ export async function generateAssessmentPdf(input: AssessmentPdfInput): Promise<
       if (value) drawTextTop(p, value, { x: x + 5, top: top + 15, size: 12, font: regular });
     };
     const big = contentW * 0.75;
-    field("Nome do(a) aluno(a)", "", MARGIN_X, big);
-    field("Nº", "", MARGIN_X + big, contentW - big);
+    field("Nome do(a) aluno(a)", student?.name ?? "", MARGIN_X, big);
+    field("Nº", student?.rollNumber ? String(student.rollNumber) : "", MARGIN_X + big, contentW - big);
     top += rowH;
     const half = contentW / 2;
     field("Turma", h.className, MARGIN_X, half);
@@ -441,7 +466,7 @@ export async function generateAssessmentPdf(input: AssessmentPdfInput): Promise<
     const top = MARGIN_TOP;
     const title = sanitize(regular, assessment.title);
     drawTextTop(p, title.length > 70 ? title.slice(0, 67) + "..." : title, { x: MARGIN_X, top, size: 8, font: bold, color: BRAND.mid });
-    const name = "Aluno(a): ______________________________";
+    const name = student ? `Aluno(a): ${sanitize(regular, student.name)}` : "Aluno(a): ______________________________";
     drawTextTop(p, name, { x: MARGIN_X + contentW - regular.widthOfTextAtSize(name, 8), top, size: 8, font: regular, color: BRAND.gray });
     p.drawLine({ start: { x: MARGIN_X, y: A4.h - top - 13 }, end: { x: MARGIN_X + contentW, y: A4.h - top - 13 }, thickness: 0.6, color: BRAND.line });
     return top + 22;
@@ -486,4 +511,24 @@ export async function generateAssessmentPdf(input: AssessmentPdfInput): Promise<
 function pointsLabel(weight: number): string {
   const v = weight.toLocaleString("pt-BR", { maximumFractionDigits: 2 });
   return `(${v} ${weight === 1 ? "ponto" : "pontos"})`;
+}
+
+/**
+ * Uma prova por aluno (nome e nº já na capa), num único PDF para imprimir.
+ * A paginação "Página X de Y" recomeça em cada prova.
+ */
+export async function generateExamCopiesPdf(
+  input: Omit<AssessmentPdfInput, "student">,
+  students: ExamStudent[],
+): Promise<{ bytes: Uint8Array; copies: number }> {
+  const merged = await PDFDocument.create();
+  merged.setTitle(input.assessment.title);
+  merged.setCreator("Deixa que eu Corrijo");
+  for (const st of students) {
+    const one = await generateAssessmentPdf({ ...input, student: st });
+    const src = await PDFDocument.load(one.bytes);
+    const pages = await merged.copyPages(src, src.getPageIndices());
+    pages.forEach((pg) => merged.addPage(pg));
+  }
+  return { bytes: await merged.save(), copies: students.length };
 }

@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { toArrayBuffer } from "@/lib/bytes";
 import { createClient } from "@/lib/supabase/server";
-import { loadAssessment } from "@/services/assessment-data";
+import { loadAssessment, loadStudents } from "@/services/assessment-data";
 import { generateAnswerSheetsPdf, type AnswerSheetCard } from "@/lib/pdf/answer-sheet-pdf";
 import { sheetQuestionsFrom } from "@/lib/answer-sheet/layout";
 import { examHeader, fileSlug } from "@/lib/assessment/header";
@@ -23,17 +23,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
     return NextResponse.json({ error: "Cadastre ao menos uma questão objetiva para gerar o cartão-resposta." }, { status: 400 });
   }
 
-  const students = data.row.class_id
-    ? ((
-        await supabase
-          .from("students")
-          .select("id, name, roll_number")
-          .eq("class_id", data.row.class_id)
-          .eq("active", true)
-          .order("roll_number", { ascending: true, nullsFirst: false })
-          .order("name")
-      ).data ?? [])
-    : [];
+  const students = await loadStudents(supabase, data.row.class_id);
 
   // Reaproveita os cartões já criados (o número do cartão não muda entre downloads).
   const { data: existing } = await supabase

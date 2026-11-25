@@ -3,7 +3,7 @@
  * Uso: npm run samples
  */
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
-import { generateAssessmentPdf } from "../src/lib/pdf/assessment-pdf";
+import { generateAssessmentPdf, generateExamCopiesPdf } from "../src/lib/pdf/assessment-pdf";
 import { generateAnswerSheetsPdf } from "../src/lib/pdf/answer-sheet-pdf";
 import { sheetQuestionsFrom } from "../src/lib/answer-sheet/layout";
 import type { PdfTemplate } from "../src/lib/models/types";
@@ -20,7 +20,17 @@ async function main() {
     console.log(`prova-${t}.pdf — ${r.pageCount} página(s)`);
   }
   const larga = sampleAssessment("larga_escala");
-  writeFileSync("amostras/prova-larga_escala.docx", await generateAssessmentDocx(examHeader({ ...larga, instructions: null }), questions));
+  const logoEscola = readFileSync("tests/fixtures/logo-escola-exemplo.jpg");
+  writeFileSync(
+    "amostras/prova-larga_escala.docx",
+    await generateAssessmentDocx(examHeader({ ...larga, instructions: null }), questions, { schoolLogo: logoEscola }),
+  );
+  const porAluno = await generateExamCopiesPdf({ assessment: { ...larga, instructions: null }, questions, schoolLogo: logoEscola }, [
+    { name: "Ana Beatriz Souza", rollNumber: 1 },
+    { name: "João Pedro Lima", rollNumber: 2 },
+  ]);
+  writeFileSync("amostras/provas-por-aluno.pdf", porAluno.bytes);
+  console.log("provas-por-aluno.pdf");
   console.log("prova-larga_escala.docx");
   const a = sampleAssessment("escolar");
   const cards = await generateAnswerSheetsPdf({

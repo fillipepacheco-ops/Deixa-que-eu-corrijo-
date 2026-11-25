@@ -13,6 +13,7 @@ function readHeader(formData: FormData) {
   return {
     title: s("title"),
     school_name: s("school_name") || null,
+    school_logo_path: s("school_logo_path") || null,
     subject: s("subject") || null,
     grade_level: s("grade_level") || null,
     class_id: s("class_id") || null,
@@ -23,22 +24,37 @@ function readHeader(formData: FormData) {
   };
 }
 
+/** Escola e logo usadas ficam como padrão para as próximas avaliações. */
+async function rememberSchool(data: { school_name: string | null; school_logo_path: string | null }) {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return;
+  await supabase.from("profiles").update({ school_name: data.school_name, school_logo_path: data.school_logo_path }).eq("id", user.id);
+}
+
+async function fillFromClass(data: ReturnType<typeof readHeader>) {
+  if (!data.class_id || (data.subject && data.grade_level)) return;
+  const supabase = await createClient();
+  const { data: turma } = await supabase.from("classes").select("subject, grade_level").eq("id", data.class_id).maybeSingle();
+  data.subject ??= turma?.subject ?? null;
+  data.grade_level ??= turma?.grade_level ?? null;
+}
+
 export async function createAssessment(_: FormState, formData: FormData): Promise<FormState> {
   const data = readHeader(formData);
   if (!data.title) return { error: "Dê um título para a avaliação." };
   const supabase = await createClient();
   // Disciplina e série em branco: usa as da turma escolhida.
-  if (data.class_id && (!data.subject || !data.grade_level)) {
-    const { data: turma } = await supabase.from("classes").select("subject, grade_level").eq("id", data.class_id).maybeSingle();
-    data.subject ??= turma?.subject ?? null;
-    data.grade_level ??= turma?.grade_level ?? null;
-  }
+  await fillFromClass(data);
   const { data: row, error } = await supabase
     .from("assessments")
     .insert({ ...data, template: "larga_escala" })
     .select("id")
     .single();
   if (error) return { error: `Não foi possível criar a avaliação. (${error.message})` };
+  await rememberSchool(data);
   // Já começa com a primeira questão para o professor digitar.
   await supabase.from("assessment_questions").insert({ assessment_id: row.id, position: 1, ...blankQuestion("multiple_choice") });
   revalidatePath("/avaliacoes");
@@ -48,9 +64,11 @@ export async function createAssessment(_: FormState, formData: FormData): Promis
 export async function updateAssessment(id: string, _: FormState, formData: FormData): Promise<FormState> {
   const data = readHeader(formData);
   if (!data.title) return { error: "A avaliação precisa de um título." };
+  await fillFromClass(data);
   const supabase = await createClient();
   const { error } = await supabase.from("assessments").update(data).eq("id", id);
   if (error) return { error: `Não foi possível salvar. (${error.message})` };
+  await rememberSchool(data);
   revalidatePath(`/avaliacoes/${id}`);
   revalidatePath("/avaliacoes");
   return { ok: true };
