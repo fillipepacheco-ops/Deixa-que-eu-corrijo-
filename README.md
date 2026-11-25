@@ -14,7 +14,7 @@ Stack: Next.js (App Router) · TypeScript · Tailwind · Supabase (Auth, Postgre
 2. Supabase → *Authentication → URL Configuration* → em **Site URL** coloque o endereço da Vercel (ex.: `https://deixa-que-eu-corrijo.vercel.app`) e adicione `https://SEU-ENDERECO/auth/confirm` em *Redirect URLs*.
 3. **Vercel** → *Add New Project* → importe este repositório → em *Environment Variables* cadastre:
    - `NEXT_PUBLIC_SUPABASE_URL`
-   - `NEXT_PUBLIC_SUPABASE_ANON_KEY`
+   - `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` (ou o nome antigo `NEXT_PUBLIC_SUPABASE_ANON_KEY`)
    (Supabase → *Project Settings → API*). → **Deploy**.
 
 Para rodar no Codespaces: copie `.env.example` para `.env.local`, preencha, e rode `npm install` e `npm run dev`.
