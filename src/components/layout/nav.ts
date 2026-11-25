@@ -29,7 +29,7 @@ export const NAV: NavItem[] = [
   { href: "/banco-de-questoes", label: "Banco de Questões", icon: Library, ready: false },
   { href: "/turmas", label: "Turmas", icon: GraduationCap, ready: true, mobile: true },
   { href: "/alunos", label: "Alunos", icon: Users, ready: true, mobile: true },
-  { href: "/correcao", label: "Correção", icon: ScanLine, ready: false },
+  { href: "/correcao", label: "Correção", icon: ScanLine, ready: true, mobile: true },
   { href: "/resultados", label: "Resultados", icon: BarChart3, ready: false },
   { href: "/relatorios", label: "Relatórios", icon: FileBarChart, ready: false },
   { href: "/conselho", label: "Conselho de Classe", icon: ClipboardList, ready: false },

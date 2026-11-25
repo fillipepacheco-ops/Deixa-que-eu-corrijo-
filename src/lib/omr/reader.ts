@@ -41,6 +41,8 @@ export interface ReadResult {
   problems: string[];
   /** Cantos encontrados na foto (para desenhar o enquadramento na tela). */
   corners?: Point[];
+  /** Transformação mm do cartão → pixel da foto (para desenhar a correção). */
+  homography?: Homography;
 }
 
 /** Converte RGBA (canvas) em tons de cinza. */
@@ -140,7 +142,28 @@ export function findFiducials(img: GrayImage): Point[] | null {
   const br = pick((p) => p.x + p.y);
   const bl = pick((p) => p.y - p.x);
   const set = new Set([tl, tr, br, bl]);
-  return set.size === 4 ? [tl, tr, br, bl] : null;
+  if (set.size !== 4) return null;
+  return plausibleCard([tl, tr, br, bl]) ? [tl, tr, br, bl] : null;
+}
+
+/** Os 4 marcadores formam um retângulo parecido com o do cartão (mesmo inclinado)? */
+function plausibleCard([tl, tr, br, bl]: Point[]): boolean {
+  const d = (a: Point, b: Point) => Math.hypot(a.x - b.x, a.y - b.y);
+  const top = d(tl, tr);
+  const bottom = d(bl, br);
+  const left = d(tl, bl);
+  const right = d(tr, br);
+  if (Math.min(top, bottom, left, right) < 40) return false;
+  // perspectiva razoável: lados opostos parecidos
+  if (Math.max(top, bottom) / Math.min(top, bottom) > 1.6) return false;
+  if (Math.max(left, right) / Math.min(left, right) > 1.6) return false;
+  // proporção entre marcadores no cartão: 269 mm / 182 mm ≈ 1,48
+  const ratio = (left + right) / (top + bottom);
+  if (ratio < 1.05 || ratio > 2.1) return false;
+  // convexo (sem "cruzar" os cantos)
+  const cross = (o: Point, a: Point, b: Point) => (a.x - o.x) * (b.y - o.y) - (a.y - o.y) * (b.x - o.x);
+  const signs = [cross(tl, tr, br), cross(tr, br, bl), cross(br, bl, tl), cross(bl, tl, tr)].map(Math.sign);
+  return signs.every((s) => s === signs[0]);
 }
 
 function sampleGray(img: GrayImage, p: Point): number {
@@ -237,5 +260,5 @@ export function readAnswerSheet(img: GrayImage, questions: SheetQuestionSpec[]):
     reads.push({ number: q.number, answer, fills, confidence: Math.round(confidence * 100) / 100 });
   }
 
-  return { ok: true, sheetNumber, rollNumber, answers, questions: reads, problems, corners };
+  return { ok: true, sheetNumber, rollNumber, answers, questions: reads, problems, corners, homography: H };
 }

@@ -25,7 +25,7 @@ const SHORTCUTS: Shortcut[] = [
   { label: "Turmas", icon: GraduationCap, href: "/turmas" },
   { label: "Alunos", icon: Users, href: "/alunos" },
   { label: "Nova avaliação", icon: FilePlus2, href: "/avaliacoes/nova" },
-  { label: "Corrigir pela câmera", icon: Camera },
+  { label: "Corrigir pela câmera", icon: Camera, href: "/correcao" },
   { label: "Banco de questões", icon: Library },
   { label: "Resultados", icon: BarChart3 },
   { label: "Conselho de Classe", icon: ClipboardList },
