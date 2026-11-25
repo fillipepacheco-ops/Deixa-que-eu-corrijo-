@@ -70,6 +70,12 @@ const COLUMN_GAP = mm(8);
 interface Piece {
   h: number;
   draw: (page: PDFPage, x: number, top: number) => void;
+  /** Pode começar uma nova coluna/página ANTES desta peça (quebra permitida aqui). */
+  brk?: boolean;
+  /** Só espaço em branco: some se cair no topo de uma coluna. */
+  space?: boolean;
+  /** Imagem: devolve uma versão menor que caiba na altura dada (ou null). */
+  shrink?: (maxH: number) => Piece | null;
 }
 
 export interface ExamStudent {
@@ -153,7 +159,7 @@ export async function generateAssessmentPdf(input: AssessmentPdfInput): Promise<
     if (cfg.questionHeading === "label") {
       const label = QUESTION_LABEL(number);
       pieces.push({
-        h: fs * 2,
+        h: fs * 1.75,
         draw: (page, x, top) => {
           drawTextTop(page, label, { x, top, size: fs, font: bold, color: BRAND.dark });
           if (cfg.showWeights && q.weight !== 1) {
@@ -183,6 +189,8 @@ export async function generateAssessmentPdf(input: AssessmentPdfInput): Promise<
     stLines.forEach((line, i) => {
       pieces.push({
         h: line.height,
+        // Pode continuar na outra coluna depois das 2 primeiras linhas, sem deixar 1 linha sozinha no fim.
+        brk: i >= 2 && i <= stLines.length - 2,
         draw: (page, x, top) => {
           if (i === 0 && cfg.questionHeading === "inline") {
             drawTextTop(page, `${number}.`, { x, top: top + line.baseline - fs * 0.8, size: fs, font: bold, color: BRAND.dark });
@@ -200,14 +208,21 @@ export async function generateAssessmentPdf(input: AssessmentPdfInput): Promise<
       const maxW = Math.min(textW, q.image?.widthMm ? mm(q.image.widthMm) : textW);
       const maxH = mm(75);
       const scale = Math.min(maxW / img.width, maxH / img.height, 72 / 150);
-      const w = img.width * scale;
-      const h = img.height * scale;
-      pieces.push({
-        h: h + lh * 0.6,
+      const pad = lh * 0.4;
+      const imagePiece = (w: number, h: number): Piece => ({
+        h: h + pad,
+        brk: true,
         draw: (page, x, top) => {
-          page.drawImage(img, { x: x + indent + (textW - w) / 2, y: A4.h - top - lh * 0.3 - h, width: w, height: h });
+          page.drawImage(img, { x: x + indent + (textW - w) / 2, y: A4.h - top - pad / 2 - h, width: w, height: h });
+        },
+        // Se faltar pouco espaço, a imagem diminui (até 65% e no mínimo 3 cm) em vez de pular de coluna.
+        shrink: (avail) => {
+          const target = avail - pad;
+          if (target < Math.max(mm(30), h * 0.65) || target >= h) return null;
+          return imagePiece((w * target) / h, target);
         },
       });
+      pieces.push(imagePiece(img.width * scale, img.height * scale));
     }
 
     // Tabela simples.
@@ -222,6 +237,7 @@ export async function generateAssessmentPdf(input: AssessmentPdfInput): Promise<
       );
       const total = rowHeights.reduce((a, b) => a + b, 0);
       pieces.push({
+        brk: true,
         h: total + lh * 0.6,
         draw: (page, x0, top0) => {
           let top = top0 + lh * 0.3;
@@ -245,14 +261,16 @@ export async function generateAssessmentPdf(input: AssessmentPdfInput): Promise<
     }
 
     // Alternativas / espaço de resposta.
-    pieces.push({ h: lh * 0.25, draw: () => {} });
+    pieces.push({ h: lh * 0.25, space: true, draw: () => {} });
     if (q.type === "multiple_choice") {
       const optIndent = fs * 2.2;
-      for (const opt of q.options) {
+      q.options.forEach((opt, oi) => {
+        const lastPair = oi === q.options.length - 1 && oi > 1; // a última alternativa não fica sozinha
         const lines = layoutRich(opt.text, { fonts: rich, size: fs, maxWidth: textW - optIndent, lineHeight: cfg.lineHeight, justify: cfg.justify });
         lines.forEach((line, i) => {
           pieces.push({
             h: line.height,
+            brk: i === 0 && !lastPair, // a alternativa nunca fica partida
             draw: (page, x, top) => {
               // rótulo alinhado à linha de base do texto (que pode ser mais alta por causa de fração)
               if (i === 0) drawTextTop(page, `(${opt.label})`, { x: x + indent, top: top + line.baseline - fs * 0.8, size: fs, font: bold, color: BRAND.mid });
@@ -260,10 +278,11 @@ export async function generateAssessmentPdf(input: AssessmentPdfInput): Promise<
             },
           });
         });
-      }
+      });
     } else if (q.type === "true_false") {
       pieces.push({
         h: lh * 1.2,
+        brk: true,
         draw: (page, x, top) => {
           drawTextTop(page, "(     ) Certo          (     ) Errado", { x: x + indent, top: top + 2, size: fs, font: regular });
         },
@@ -273,6 +292,7 @@ export async function generateAssessmentPdf(input: AssessmentPdfInput): Promise<
       const gap = Math.max(lh * 1.35, mm(7));
       pieces.push({
         h: n * gap + 4,
+        brk: true,
         draw: (page, x, top) => {
           for (let i = 1; i <= n; i++) {
             const y = A4.h - top - i * gap;
@@ -281,7 +301,7 @@ export async function generateAssessmentPdf(input: AssessmentPdfInput): Promise<
         },
       });
     }
-    pieces.push({ h: lh * 0.9, draw: () => {} }); // respiro entre questões
+    pieces.push({ h: lh * 0.6, space: true, draw: () => {} }); // respiro entre questões
     return { number, pieces };
   });
 
@@ -482,21 +502,58 @@ export async function generateAssessmentPdf(input: AssessmentPdfInput): Promise<
   newPage();
   const questionPages: Record<number, number> = {};
 
+  // Encaixe das questões, uma embaixo da outra, com o mínimo de espaço vazio:
+  //  - a questão inteira cabe → entra inteira;
+  //  - não cabe → continua na outra coluna num ponto bom (depois do título + 2 linhas,
+  //    entre alternativas, antes da imagem), nunca partindo uma alternativa;
+  //  - se o espaço que sobra é pequeno, a questão vai inteira para a próxima coluna;
+  //  - imagem que quase cabe diminui um pouco em vez de pular.
+  const columnH = () => areaBottom - areaTop;
   for (const g of groups) {
-    const total = g.pieces.reduce((s, p) => s + p.h, 0);
-    // Respiro final não precisa caber.
-    const needed = total - g.pieces[g.pieces.length - 1].h;
-    // Questão inteira não cabe no espaço restante: vai inteira para a próxima coluna/página.
-    if (cursor + needed > areaBottom && cursor > areaTop) nextColumn();
-    questionPages[g.number] = pages.length;
-    for (const piece of g.pieces) {
-      if (cursor + piece.h > areaBottom && cursor > areaTop && piece.h > 0) {
-        // Só acontece se a questão for maior que uma coluna inteira.
-        nextColumn();
-      }
-      piece.draw(page, colX(), cursor);
-      cursor += piece.h;
+    const pieces = [...g.pieces];
+    while (pieces.length && pieces[pieces.length - 1].space) pieces.pop(); // respiro final não precisa caber
+    const tail = g.pieces.slice(pieces.length);
+    const total = pieces.reduce((s, p) => s + p.h, 0);
+    const room = areaBottom - cursor;
+
+    // trechos que não podem ser separados
+    const segments: Piece[][] = [];
+    for (const p of pieces) {
+      if (!segments.length || p.brk) segments.push([p]);
+      else segments[segments.length - 1].push(p);
     }
+    const segH = (seg: Piece[]) => seg.reduce((s, p) => s + p.h, 0);
+
+    if (total > room && cursor > areaTop) {
+      const first = segH(segments[0]);
+      // pouco espaço sobrando, ou nem o começo da questão cabe: começa na próxima coluna
+      if (room < first || room < Math.min(lh * 4, columnH() * 0.12)) nextColumn();
+    }
+    questionPages[g.number] = pages.length;
+
+    // questão que continua na outra coluna/página: aviso discreto no pé da coluna
+    const continueTo = () => {
+      const t = col < cfg.columns - 1 ? "continua ao lado ›" : "continua na próxima página ›";
+      drawTextTop(page, t, { x: colX() + colW - italic.widthOfTextAtSize(t, fs * 0.7), top: areaBottom + 1, size: fs * 0.7, font: italic, color: BRAND.gray });
+      nextColumn();
+    };
+    for (const seg of segments) {
+      let h = segH(seg);
+      if (cursor + h > areaBottom && cursor > areaTop) {
+        const img = seg.length === 1 ? seg[0].shrink?.(areaBottom - cursor) : null;
+        if (img) {
+          seg[0] = img;
+          h = img.h;
+        } else continueTo();
+      }
+      for (const piece of seg) {
+        if (piece.space && cursor === areaTop) continue;
+        if (cursor + piece.h > areaBottom && cursor > areaTop && piece.h > 0) continueTo(); // trecho maior que uma coluna
+        piece.draw(page, colX(), cursor);
+        cursor += piece.h;
+      }
+    }
+    for (const piece of tail) if (cursor > areaTop) cursor = Math.min(areaBottom, cursor + piece.h);
   }
 
   // ---------- rodapé com paginação ----------

@@ -188,6 +188,9 @@ function coverPage(h: ExamHeader, opts: DocxOptions): (Paragraph | Table)[] {
 
 function questionBlocks(q: AssessmentQuestion, number: number): (Paragraph | Table)[] {
   const blocks: (Paragraph | Table)[] = [];
+  // Sem "manter com o próximo" em tudo: o Word encaixa as questões uma embaixo da outra
+  // e só segura junto o que não deve separar (título + início, última linha do enunciado
+  // + 1ª alternativa, cada alternativa inteira, as duas últimas alternativas).
   const keep = { keepNext: true, keepLines: true };
 
   const heading: TextRun[] = [new TextRun({ text: QUESTION_LABEL(number), bold: true, size: SIZE, color: DARK, font: FONT })];
@@ -195,15 +198,17 @@ function questionBlocks(q: AssessmentQuestion, number: number): (Paragraph | Tab
     const v = q.weight.toLocaleString("pt-BR", { maximumFractionDigits: 2 });
     heading.push(new TextRun({ text: `   (${v} ${q.weight === 1 ? "ponto" : "pontos"})`, italics: true, size: 20, color: GRAY, font: FONT }));
   }
-  blocks.push(new Paragraph({ ...keep, spacing: { before: 360, after: 120 }, children: heading }));
+  blocks.push(new Paragraph({ ...keep, spacing: { before: 240, after: 80 }, children: heading }));
 
   const paragraphs = (q.statement || "").split(/\r?\n/).filter((p) => p.trim() !== "");
-  (paragraphs.length ? paragraphs : [" "]).forEach((p) =>
+  const stmt = paragraphs.length ? paragraphs : [" "];
+  stmt.forEach((p, i) =>
     blocks.push(
       new Paragraph({
-        ...keep,
+        keepNext: i === stmt.length - 1, // o fim do enunciado fica com o que vem depois
+        widowControl: true,
         alignment: AlignmentType.JUSTIFIED,
-        spacing: { ...LINE_15, after: 120 },
+        spacing: { ...LINE_15, after: 80 },
         children: markupToDocx(p, { size: SIZE, font: FONT }),
       }),
     ),
@@ -269,10 +274,9 @@ function questionBlocks(q: AssessmentQuestion, number: number): (Paragraph | Tab
 
   if (q.type === "multiple_choice") {
     q.options.forEach((opt, i) => {
-      const last = i === q.options.length - 1;
       blocks.push(
         new Paragraph({
-          keepNext: !last,
+          keepNext: i === q.options.length - 2, // as duas últimas alternativas ficam juntas
           keepLines: true,
           alignment: AlignmentType.JUSTIFIED,
           indent: { left: 567, hanging: 567 },
