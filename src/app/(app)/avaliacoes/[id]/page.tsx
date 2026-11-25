@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { ArrowLeft, BarChart3, Eye, Plus, Trash2 } from "lucide-react";
+import { ArrowLeft, BarChart3, Eye, FileUp, Plus, Trash2 } from "lucide-react";
 import { buttonClass } from "@/components/ui/button";
 import { createClient } from "@/lib/supabase/server";
 import { loadAssessment, loadStudents, questionImageUrls, schoolLogoUrl } from "@/services/assessment-data";
@@ -122,6 +122,12 @@ export default async function AvaliacaoPage({ params }: { params: Promise<{ id: 
                 </form>
               ))}
             </div>
+            <Link
+              href={`/avaliacoes/${id}/importar`}
+              className="mt-2 flex w-full items-center justify-center gap-1.5 rounded-xl border border-line bg-white px-3 py-2.5 text-[13px] font-semibold text-brand-900 hover:border-brand-200 active:scale-[0.98]"
+            >
+              <FileUp size={15} /> Importar questões de um PDF ou Word
+            </Link>
           </div>
         </section>
 

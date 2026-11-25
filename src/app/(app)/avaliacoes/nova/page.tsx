@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, ChevronRight, FileUp } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { createAssessment } from "@/services/assessments";
 import { schoolLogoUrl } from "@/services/assessment-data";
@@ -30,6 +30,19 @@ export default async function NovaAvaliacaoPage() {
         title="Nova avaliação"
         description="Modelo de larga escala: capa com logo, cabeçalho e instruções; questões em 2 colunas, Arial 12, justificado, espaçamento 1,5. Estes dados também saem nos cartões-resposta."
       />
+      <Link
+        href="/avaliacoes/importar"
+        className="mb-5 flex max-w-3xl items-center gap-3 rounded-2xl border border-line bg-white p-4 transition hover:border-brand-200 hover:shadow-md active:scale-[0.99]"
+      >
+        <span className="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-brand-50 text-brand-700">
+          <FileUp size={21} />
+        </span>
+        <span className="min-w-0 flex-1">
+          <span className="block font-bold text-brand-900">Já tem a prova pronta?</span>
+          <span className="block text-[13px] text-muted">Importe de um PDF ou Word: o app separa as questões e as alternativas.</span>
+        </span>
+        <ChevronRight size={18} className="text-muted" />
+      </Link>
       <Card className="max-w-3xl p-5 sm:p-6">
         <ActionForm action={createAssessment} submitLabel="Criar e adicionar questões" submitClassName="w-full sm:w-auto">
           <HeaderFields

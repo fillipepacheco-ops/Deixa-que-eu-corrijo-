@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { blankQuestion, parseQuestionForm } from "@/lib/assessment/question-form";
+import { importedToRows } from "@/lib/import/to-rows";
 import type { QuestionType } from "@/lib/models/types";
 import type { FormState } from "./classes";
 
@@ -42,10 +43,26 @@ async function fillFromClass(data: ReturnType<typeof readHeader>) {
   data.grade_level ??= turma?.grade_level ?? null;
 }
 
+function readImported(formData: FormData, userId: string) {
+  if (!formData.has("imported")) return null;
+  try {
+    return importedToRows(JSON.parse(String(formData.get("imported") ?? "[]")), userId);
+  } catch {
+    return { ok: false as const, error: "Arquivo não lido. Escolha a prova de novo." };
+  }
+}
+
 export async function createAssessment(_: FormState, formData: FormData): Promise<FormState> {
   const data = readHeader(formData);
   if (!data.title) return { error: "Dê um título para a avaliação." };
   const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { error: "Sessão expirada. Entre de novo." };
+  // Prova importada de PDF/Word: as questões vêm prontas.
+  const imported = readImported(formData, user.id);
+  if (imported && !imported.ok) return { error: imported.error };
   // Disciplina e série em branco: usa as da turma escolhida.
   await fillFromClass(data);
   const { data: row, error } = await supabase
@@ -55,8 +72,15 @@ export async function createAssessment(_: FormState, formData: FormData): Promis
     .single();
   if (error) return { error: `Não foi possível criar a avaliação. (${error.message})` };
   await rememberSchool(data);
-  // Já começa com a primeira questão para o professor digitar.
-  await supabase.from("assessment_questions").insert({ assessment_id: row.id, position: 1, ...blankQuestion("multiple_choice") });
+  if (imported?.ok) {
+    const { error: qErr } = await supabase
+      .from("assessment_questions")
+      .insert(imported.rows.map((q, i) => ({ ...q, assessment_id: row.id, position: i + 1 })));
+    if (qErr) return { error: `A avaliação foi criada, mas as questões não foram salvas. (${qErr.message})` };
+  } else {
+    // Já começa com a primeira questão para o professor digitar.
+    await supabase.from("assessment_questions").insert({ assessment_id: row.id, position: 1, ...blankQuestion("multiple_choice") });
+  }
   revalidatePath("/avaliacoes");
   redirect(`/avaliacoes/${row.id}`);
 }
@@ -183,4 +207,30 @@ export async function duplicateQuestion(assessmentId: string, questionId: string
     await renumber(assessmentId, ids);
   }
   revalidatePath(`/avaliacoes/${assessmentId}`);
+}
+
+/** Acrescenta questões importadas de PDF/Word no fim de uma avaliação que já existe. */
+export async function appendImportedQuestions(assessmentId: string, imported: unknown): Promise<FormState> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { error: "Sessão expirada. Entre de novo." };
+  const parsed = importedToRows(imported, user.id);
+  if (!parsed.ok) return { error: parsed.error };
+  const { data: last } = await supabase
+    .from("assessment_questions")
+    .select("position, statement, options")
+    .eq("assessment_id", assessmentId)
+    .order("position", { ascending: false });
+  // Se a avaliação só tem a questão em branco do começo, ela é substituída.
+  const onlyBlank = (last ?? []).length === 1 && !String(last![0].statement ?? "").trim() && !(last![0].options as { text: string }[] | null)?.some((o) => o.text?.trim());
+  if (onlyBlank) await supabase.from("assessment_questions").delete().eq("assessment_id", assessmentId);
+  const start = onlyBlank ? 0 : (last?.[0]?.position ?? 0);
+  const { error } = await supabase
+    .from("assessment_questions")
+    .insert(parsed.rows.map((q, i) => ({ ...q, assessment_id: assessmentId, position: start + i + 1 })));
+  if (error) return { error: `Não foi possível salvar as questões. (${error.message})` };
+  revalidatePath(`/avaliacoes/${assessmentId}`);
+  return { ok: true };
 }

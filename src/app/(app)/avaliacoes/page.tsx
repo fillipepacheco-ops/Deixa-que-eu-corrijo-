@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { Eye, FilePlus2, Pencil } from "lucide-react";
+import { Eye, FilePlus2, FileUp, Pencil } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { Card, EmptyState, PageHeader } from "@/components/ui/PageHeader";
 import { buttonClass } from "@/components/ui/button";
@@ -22,9 +22,14 @@ export default async function AvaliacoesPage() {
         title="Avaliações"
         description="Crie a prova uma vez: o sistema gera o PDF, o arquivo editável do Word e os cartões-resposta com o mesmo cabeçalho."
         actions={
-          <Link href="/avaliacoes/nova" className={buttonClass()}>
-            <FilePlus2 size={18} /> Nova avaliação
-          </Link>
+          <>
+            <Link href="/avaliacoes/nova" className={buttonClass()}>
+              <FilePlus2 size={18} /> Nova avaliação
+            </Link>
+            <Link href="/avaliacoes/importar" className={buttonClass("secondary")}>
+              <FileUp size={18} /> Importar prova (PDF ou Word)
+            </Link>
+          </>
         }
       />
       {items.length === 0 ? (
@@ -32,9 +37,14 @@ export default async function AvaliacoesPage() {
           title="Nenhuma avaliação ainda"
           text="Comece pelo cabeçalho (escola, turma, data); depois é só digitar as questões."
           action={
-            <Link href="/avaliacoes/nova" className={buttonClass()}>
-              Criar primeira avaliação
-            </Link>
+            <div className="flex flex-wrap justify-center gap-2">
+              <Link href="/avaliacoes/nova" className={buttonClass()}>
+                Criar primeira avaliação
+              </Link>
+              <Link href="/avaliacoes/importar" className={buttonClass("secondary")}>
+                Importar de PDF ou Word
+              </Link>
+            </div>
           }
         />
       ) : (
