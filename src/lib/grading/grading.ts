@@ -9,6 +9,7 @@
  *   null / undefined                      → em branco
  *   "*"                                   → mais de uma marcação (dupla marcação)
  *   "?"                                   → leitura incerta (exige revisão do professor)
+ *   "042" (Tipo B)                        → centena, dezena e unidade marcadas; "_" = coluna sem marcação
  */
 import type { AnnulPolicy, QuestionType } from "@/lib/models/types";
 
@@ -83,6 +84,16 @@ function isObjective(type: QuestionType): boolean {
   return type === "multiple_choice" || type === "true_false";
 }
 
+/** Tipo B: "042" = 42. Coluna em branco ("_") ou valor inválido = resposta errada. */
+export function numericValue(s: string): number | null {
+  const t = s.trim();
+  return /^\d{1,3}$/.test(t) ? Number(t) : null;
+}
+
+function isManual(type: QuestionType) {
+  return type === "essay" || type === "lined";
+}
+
 export function gradeSubmission(
   key: AnswerKeyItem[],
   answers: Record<number, GivenAnswer>,
@@ -134,7 +145,7 @@ export function gradeSubmission(
 
     if (given === null || given === undefined || given === "") {
       // Discursiva sem nota lançada ainda não é "em branco": aguarda o professor.
-      if (item.type === "essay") {
+      if (isManual(item.type)) {
         questions.push({ number: item.number, given, status: "pending_manual", points: 0, maxPoints: weight });
         continue;
       }
@@ -149,14 +160,17 @@ export function gradeSubmission(
       continue;
     }
 
-    if (item.type === "essay" || (item.type === "short_answer" && item.accepted.length === 0)) {
+    if (isManual(item.type) || (item.type === "short_answer" && item.accepted.length === 0)) {
       questions.push({ number: item.number, given, status: "pending_manual", points: 0, maxPoints: weight });
       continue;
     }
 
-    const ok = isObjective(item.type)
-      ? item.accepted.some((a) => a.toUpperCase() === given.toUpperCase())
-      : item.accepted.some((a) => normalizeAnswer(a) === normalizeAnswer(given));
+    const ok =
+      item.type === "numeric"
+        ? numericValue(given) !== null && item.accepted.some((a) => numericValue(a) === numericValue(given))
+        : isObjective(item.type)
+          ? item.accepted.some((a) => a.toUpperCase() === given.toUpperCase())
+          : item.accepted.some((a) => normalizeAnswer(a) === normalizeAnswer(given));
 
     if (ok) {
       questions.push({ number: item.number, given, status: "correct", points: weight, maxPoints: weight });

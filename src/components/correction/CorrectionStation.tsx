@@ -411,6 +411,9 @@ export function CorrectionStation(props: Props) {
                 return (
                   <div key={q.number} className="mt-3">
                     <p className="text-[13px] text-amber-900">Não foi possível identificar com segurança a questão {q.number}.</p>
+                    {spec?.numeric ? (
+                      <NumericFix onSet={(v) => setAnswers((a) => ({ ...a, [q.number]: v }))} />
+                    ) : (
                     <div className="mt-1.5 flex flex-wrap gap-1.5">
                       {[...(spec?.labels ?? []), "Em branco"].map((l) => (
                         <button
@@ -423,6 +426,7 @@ export function CorrectionStation(props: Props) {
                         </button>
                       ))}
                     </div>
+                    )}
                   </div>
                 );
               })}
@@ -575,6 +579,34 @@ function QuestionGrid({ grade, specs, answerKey }: { grade: GradeResult; specs: 
           })}
       </div>
       <p className="mt-2 text-[11px] text-muted">Verde: certa · Vermelho: errada ou em branco (na foto, o contorno tracejado verde mostra a resposta certa).</p>
+    </div>
+  );
+}
+
+/** Tipo B com leitura duvidosa: o professor digita o número que o aluno marcou. */
+function NumericFix({ onSet }: { onSet: (v: string | null) => void }) {
+  const [v, setV] = useState("");
+  return (
+    <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
+      <input
+        inputMode="numeric"
+        maxLength={3}
+        value={v}
+        onChange={(e) => setV(e.target.value.replace(/\D/g, ""))}
+        placeholder="Ex.: 042"
+        className="w-24 rounded-lg border border-amber-300 bg-white px-3 py-2 text-[16px] font-bold text-amber-900"
+      />
+      <button
+        type="button"
+        disabled={!v}
+        onClick={() => onSet(v.padStart(3, "0"))}
+        className="rounded-lg border border-amber-300 bg-white px-3 py-2 text-[14px] font-bold text-amber-900 disabled:opacity-50"
+      >
+        Confirmar
+      </button>
+      <button type="button" onClick={() => onSet(null)} className="rounded-lg border border-amber-300 bg-white px-3 py-2 text-[14px] font-bold text-amber-900">
+        Em branco
+      </button>
     </div>
   );
 }

@@ -11,7 +11,16 @@ export const QUESTION_TYPE_NAMES: Record<QuestionType, string> = {
   true_false: "Certo ou errado",
   short_answer: "Resposta curta",
   essay: "Discursiva",
+  numeric: "Tipo B (resposta numérica)",
+  lined: "Tipo D (10 linhas)",
 };
+
+/** Resposta do Tipo B: número inteiro de 0 a 999 (sem zeros à esquerda ao guardar). */
+export function parseNumericAnswer(v: string): string | null {
+  const t = v.trim();
+  if (!/^\d{1,3}$/.test(t)) return null;
+  return String(Number(t));
+}
 
 export interface ParsedQuestion {
   type: QuestionType;
@@ -49,6 +58,13 @@ export function parseQuestionForm(form: FormLike): { ok: true; data: ParsedQuest
   } else if (type === "true_false") {
     const v = str(form.get("correct_tf"));
     correct = v === "C" || v === "E" ? [v] : [];
+  } else if (type === "numeric") {
+    const raw = str(form.get("expected_number"));
+    if (raw) {
+      const n = parseNumericAnswer(raw);
+      if (n === null) return { ok: false, error: "A resposta do Tipo B é um número inteiro de 0 a 999." };
+      correct = [n];
+    }
   } else if (type === "short_answer") {
     correct = str(form.get("expected"))
       .split(";")

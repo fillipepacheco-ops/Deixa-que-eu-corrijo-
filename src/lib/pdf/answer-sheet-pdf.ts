@@ -157,6 +157,19 @@ export async function generateAnswerSheetsPdf(input: AnswerSheetInput): Promise<
       const w = bold.widthOfTextAtSize(h.label, 8);
       drawTextTop(page, h.label, { x: toX(h.x) - w / 2, top: mm(h.y) - 3, size: 8, font: bold, color: BRAND.mid });
     }
+    // Tipo B: letras C D U em cima das colunas de algarismos + moldura do bloco.
+    for (const h of layout.blockHeaders) {
+      const w = bold.widthOfTextAtSize(h.label, 8);
+      drawTextTop(page, h.label, { x: toX(h.x) - w / 2, top: mm(h.y) - 3, size: 8, font: bold, color: BRAND.mid });
+    }
+    for (const q of layout.questionLabels) {
+      if (!layout.blockHeaders.some((h) => h.label === "C" && Math.abs(h.y - q.y) < 0.01 && h.x > q.x && h.x - q.x < 12)) continue;
+      page.drawRectangle({
+        x: toX(q.x - 3.5), y: toY(q.y + 52), width: mm(29), height: mm(55.5),
+        borderColor: BRAND.line, borderWidth: 0.6,
+      });
+      drawTextTop(page, "TIPO B", { x: toX(q.x) - mm(2.4), top: mm(q.y + 3), size: 5, font: bold, color: BRAND.gray });
+    }
     for (const q of layout.questionLabels) {
       const label = String(q.number).padStart(2, "0");
       const w = bold.widthOfTextAtSize(label, 9);
@@ -166,8 +179,9 @@ export async function generateAnswerSheetsPdf(input: AnswerSheetInput): Promise<
       page.drawCircle({ x: toX(b.x), y: toY(b.y), size: mm(b.r), borderColor: BRAND.ink, borderWidth: 0.8 });
       // Certo/errado: a letra fica dentro (as colunas A–E não se aplicam).
       if (b.inner) {
-        const w = regular.widthOfTextAtSize(b.label, 5);
-        drawTextTop(page, b.label, { x: toX(b.x) - w / 2, top: mm(b.y) - 2, size: 5, font: regular, color: rgb(0.7, 0.72, 0.71) });
+        const t = b.text ?? b.label;
+        const w = regular.widthOfTextAtSize(t, 5);
+        drawTextTop(page, t, { x: toX(b.x) - w / 2, top: mm(b.y) - 2, size: 5, font: regular, color: rgb(0.7, 0.72, 0.71) });
       }
     }
 

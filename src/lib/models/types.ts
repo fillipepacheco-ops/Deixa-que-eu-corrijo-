@@ -3,7 +3,11 @@
  * Os nomes seguem as entidades do Supabase (supabase/migrations).
  */
 
-export type QuestionType = "multiple_choice" | "true_false" | "short_answer" | "essay";
+/**
+ * numeric = Tipo B do PAS (resposta de 000 a 999 marcada em centena/dezena/unidade no cartão)
+ * lined   = Tipo D do PAS (resposta escrita num quadro de 10 linhas numeradas)
+ */
+export type QuestionType = "multiple_choice" | "true_false" | "short_answer" | "essay" | "numeric" | "lined";
 export type Difficulty = "facil" | "medio" | "dificil";
 export type PdfTemplate = "escolar" | "simulado" | "larga_escala" | "personalizado";
 export type AnnulPolicy = "credit_all" | "remove";

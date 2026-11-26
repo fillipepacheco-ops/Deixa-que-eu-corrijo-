@@ -1,7 +1,7 @@
 /**
  * RESULTADOS — estatísticas da turma e análise por questão.
  */
-import { MULTIPLE_MARKS, UNCERTAIN, type AnswerKeyItem, type GivenAnswer } from "./grading";
+import { numericValue, MULTIPLE_MARKS, UNCERTAIN, type AnswerKeyItem, type GivenAnswer } from "./grading";
 
 export interface ScoreSummary {
   count: number;
@@ -52,6 +52,12 @@ export function analyzeQuestions(
     .sort((a, b) => a.number - b.number)
     .map((item) => {
       const labels = optionLabels[item.number] ?? [];
+      // Tipo B: "042" e "42" são a mesma resposta
+      const norm = (v: string) => {
+        if (item.type !== "numeric") return v.toUpperCase();
+        const n = numericValue(v);
+        return n === null ? v : String(n);
+      };
       const counts = new Map<string, number>(labels.map((l) => [l, 0]));
       let blank = 0;
       let multiple = 0;
@@ -63,11 +69,11 @@ export function analyzeQuestions(
         considered++;
         if (g === null || g === undefined || g === "") blank++;
         else if (g === MULTIPLE_MARKS) multiple++;
-        else counts.set(g.toUpperCase(), (counts.get(g.toUpperCase()) ?? 0) + 1);
-        if (g && item.accepted.some((a) => a.toUpperCase() === g.toUpperCase())) hits++;
+        else counts.set(norm(g), (counts.get(norm(g)) ?? 0) + 1);
+        if (g && g !== MULTIPLE_MARKS && item.accepted.some((a) => norm(a) === norm(g))) hits++;
       }
       const pct = (n: number) => (considered ? r2((n / considered) * 100) : 0);
-      const accepted = new Set(item.accepted.map((a) => a.toUpperCase()));
+      const accepted = new Set(item.accepted.map(norm));
       const distribution = [...counts.entries()].map(([option, count]) => ({
         option,
         count,

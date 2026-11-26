@@ -297,6 +297,41 @@ export async function generateAssessmentPdf(input: AssessmentPdfInput): Promise<
           drawTextTop(page, "(     ) Certo          (     ) Errado", { x: x + indent, top: top + 2, size: fs, font: regular });
         },
       });
+    } else if (q.type === "numeric") {
+      // Tipo B: a resposta vai no cartão (centena, dezena, unidade)
+      const note = wrapText(italic, fs * 0.78, "Tipo B: marque a resposta no cartão-resposta (centena, dezena e unidade).", textW);
+      note.forEach((line, i) =>
+        pieces.push({
+          h: fs * 0.78 * 1.45 + (i === 0 ? 2 : 0),
+          brk: false,
+          draw: (page, x, top) => {
+            drawTextTop(page, line, { x: x + indent, top: top + (i === 0 ? 2 : 0), size: fs * 0.78, font: italic, color: BRAND.gray });
+          },
+        }),
+      );
+    } else if (q.type === "lined") {
+      // Tipo D: quadro com 10 linhas numeradas (como no PAS)
+      const rows = 10;
+      const rowH = Math.max(lh * 1.2, mm(7.5));
+      const numW = mm(6);
+      pieces.push({
+        h: rows * rowH + 8,
+        brk: false, // o quadro fica junto do fim do enunciado
+        draw: (page, x, top) => {
+          const left = x + indent;
+          const w = colW - indent;
+          const y0 = A4.h - top - 4;
+          page.drawRectangle({ x: left, y: y0 - rows * rowH, width: w, height: rows * rowH, borderColor: BRAND.ink, borderWidth: 0.8 });
+          page.drawLine({ start: { x: left + numW, y: y0 }, end: { x: left + numW, y: y0 - rows * rowH }, thickness: 0.6, color: BRAND.ink });
+          for (let i = 1; i <= rows; i++) {
+            const yb = y0 - i * rowH;
+            if (i < rows) page.drawLine({ start: { x: left + numW, y: yb }, end: { x: left + w, y: yb }, thickness: 0.4, color: BRAND.line });
+            const t = String(i);
+            const tw = regular.widthOfTextAtSize(t, 8);
+            page.drawText(t, { x: left + (numW - tw) / 2, y: yb + (rowH - 8) / 2 + 1.5, size: 8, font: regular, color: BRAND.gray });
+          }
+        },
+      });
     } else {
       const n = q.type === "short_answer" ? 2 : cfg.essayLines;
       const gap = Math.max(lh * 1.35, mm(7));

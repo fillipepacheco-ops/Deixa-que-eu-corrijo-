@@ -16,7 +16,7 @@ import { ConfirmButton } from "@/components/ui/ConfirmButton";
 type State = { error?: string; ok?: boolean };
 
 function answerSummary(q: AssessmentQuestion): { text: string; missing: boolean } {
-  if (q.type === "essay") return { text: "Correção manual", missing: false };
+  if (q.type === "essay" || q.type === "lined") return { text: "Correção manual", missing: false };
   if (!q.correct_answers.length) return { text: "Sem resposta no gabarito", missing: true };
   if (q.type === "true_false") return { text: `Resposta: ${q.correct_answers[0] === "C" ? "Certo" : "Errado"}`, missing: false };
   return { text: `Resposta: ${q.correct_answers.join(" ou ")}`, missing: false };
@@ -175,6 +175,31 @@ export function QuestionEditor({
               <label className="label">Resposta esperada (separe variações com ;)</label>
               <input className="field" name="expected" defaultValue={q.correct_answers.join("; ")} placeholder="Ex.: fotossíntese; fotossintese" />
             </div>
+          )}
+
+          {type === "numeric" && (
+            <div>
+              <label className="label">Resposta correta (número inteiro de 0 a 999)</label>
+              <input
+                className="field w-40!"
+                name="expected_number"
+                inputMode="numeric"
+                pattern="[0-9]*"
+                maxLength={3}
+                defaultValue={q.correct_answers[0] ?? ""}
+                placeholder="Ex.: 42"
+              />
+              <p className="mt-1.5 text-[12px] text-muted">
+                Tipo B (PAS): o aluno calcula e marca no cartão a centena, a dezena e a unidade. Ex.: 42 → marca 0, 4 e 2. Resposta com
+                decimal ou maior que 999: oriente no enunciado como arredondar (ex.: “despreze a parte fracionária”).
+              </p>
+            </div>
+          )}
+
+          {type === "lined" && (
+            <p className="rounded-lg bg-brand-50 px-3 py-2 text-[13px] text-brand-900">
+              Tipo D (PAS): a prova sai com um quadro de 10 linhas numeradas para o aluno escrever a resposta. A nota é lançada pelo professor.
+            </p>
           )}
 
           {type === "essay" && <p className="rounded-lg bg-brand-50 px-3 py-2 text-[13px] text-brand-900">Discursiva: a prova sai com 6 linhas para resposta e a nota é lançada pelo professor.</p>}

@@ -6,6 +6,8 @@
  *    (linha comprida que não termina em ponto), para o parágrafo ficar
  *    justificado por inteiro. Versos e listas (linhas curtas) ficam como estão.
  */
+import { plainToMarkup } from "@/lib/math/paste";
+
 const SOFT_MIN = 45; // linhas mais curtas que isso são intencionais (versos, itens)
 
 export function tidyText(text: string | null | undefined): string {
@@ -31,5 +33,6 @@ export function tidyText(text: string | null | undefined): string {
     else out.push(line);
   }
   // sem linhas vazias no começo/fim nem várias seguidas
-  return out.join("\n").replace(/\n{3,}/g, "\n\n").trim();
+  // x² → x^{2}, ½ → \frac{1}{2} (expoentes digitados direto saem certinhos na prova)
+  return plainToMarkup(out.join("\n").replace(/\n{3,}/g, "\n\n").trim());
 }

@@ -26,7 +26,7 @@ import type { QuestionType } from "@/lib/models/types";
 
 export const metadata: Metadata = { title: "Avaliação" };
 
-const ADD_TYPES: QuestionType[] = ["multiple_choice", "true_false", "short_answer", "essay"];
+const ADD_TYPES: QuestionType[] = ["multiple_choice", "true_false", "numeric", "lined", "short_answer", "essay"];
 
 
 export default async function AvaliacaoPage({ params }: { params: Promise<{ id: string }> }) {
@@ -150,7 +150,7 @@ export default async function AvaliacaoPage({ params }: { params: Promise<{ id: 
                     <tr key={q.id} className={q.annulled ? "text-muted line-through" : ""}>
                       <td className="px-5 py-2 font-semibold">{String(i + 1).padStart(2, "0")}</td>
                       <td className="py-2">
-                        {q.type === "essay" ? (
+                        {q.type === "essay" || q.type === "lined" ? (
                           <span className="text-muted">manual</span>
                         ) : q.correct_answers.length ? (
                           <span className="font-bold text-brand-700">{q.correct_answers.join(" / ")}</span>

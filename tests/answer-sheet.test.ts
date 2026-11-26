@@ -145,3 +145,48 @@ test("leitura: imagem sem cartão retorna orientação, não inventa resultado",
   assert.match(r.error!, /quadrados pretos/);
   assert.deepEqual(r.answers, {});
 });
+
+test("Tipo B (PAS): centena, dezena e unidade no cartão, lidas e corrigidas", () => {
+  const qs = [
+    { position: 1, type: "multiple_choice", options: [{ label: "A" }, { label: "B" }, { label: "C" }, { label: "D" }] },
+    { position: 2, type: "numeric", options: [] },
+    { position: 3, type: "lined", options: [] },
+    { position: 4, type: "numeric", options: [] },
+    { position: 5, type: "numeric", options: [] },
+    { position: 6, type: "true_false", options: [] },
+  ];
+  const specs = sheetQuestionsFrom(qs);
+  assert.deepEqual(specs.map((s) => s.number), [1, 2, 4, 5, 6]); // Tipo D não vai para o cartão
+  const layout = sheetLayout(specs);
+  assert.equal(layout.bubbles.filter((b) => b.question === 2).length, 30);
+  // blocos não se sobrepõem a outras bolhas
+  for (const a of layout.bubbles) for (const b of layout.bubbles) {
+    if (a !== b) assert.ok(Math.hypot(a.x - b.x, a.y - b.y) > a.r + b.r, `${a.question}${a.label} x ${b.question}${b.label}`);
+    assert.ok(a.y < 270 && a.x < 200);
+  }
+  const img = renderSheetPhoto({
+    questions: specs,
+    sheetNumber: 4242,
+    marks: { 1: "B", 2: ["C0", "D4", "U2"], 4: ["C1", "D2"], 5: ["C9", "C8", "D0", "U0"], 6: "E" },
+  });
+  const r = readAnswerSheet(img, specs);
+  assert.ok(r.ok, r.error);
+  assert.equal(r.answers[2], "042");
+  assert.equal(r.answers[4], "12_"); // faltou a unidade
+  assert.equal(r.answers[5], "*"); // duas marcas na centena
+  assert.equal(r.answers[6], "E");
+  const g = gradeSubmission(
+    [
+      { number: 1, type: "multiple_choice", accepted: ["B"], weight: 1, annulled: false },
+      { number: 2, type: "numeric", accepted: ["42"], weight: 1, annulled: false },
+      { number: 4, type: "numeric", accepted: ["12"], weight: 1, annulled: false },
+      { number: 5, type: "numeric", accepted: ["900"], weight: 1, annulled: false },
+      { number: 6, type: "true_false", accepted: ["E"], weight: 1, annulled: false },
+      { number: 3, type: "lined", accepted: [], weight: 1, annulled: false },
+    ],
+    r.answers,
+  );
+  assert.equal(g.correctCount, 3);
+  assert.equal(g.questions.find((q) => q.number === 4)?.status, "wrong");
+  assert.equal(g.questions.find((q) => q.number === 3)?.status, "pending_manual");
+});

@@ -89,7 +89,7 @@ export async function loadAssessmentResults(supabase: SupabaseClient, id: string
   });
 
   const specs = sheetQuestionsFrom(questions);
-  const optionLabels = Object.fromEntries(specs.map((s) => [s.number, s.labels]));
+  const optionLabels = Object.fromEntries(specs.map((s) => [s.number, s.numeric ? [] : s.labels]));
   const analysis = analyzeQuestions(
     key.filter((k) => specs.some((s) => s.number === k.number)),
     answersList,

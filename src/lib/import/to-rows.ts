@@ -14,7 +14,7 @@ export interface ImportedRow {
   image_path: string | null;
 }
 
-const TYPES: QuestionType[] = ["multiple_choice", "true_false", "short_answer", "essay"];
+const TYPES: QuestionType[] = ["multiple_choice", "true_false", "short_answer", "essay", "numeric", "lined"];
 const LETTERS = ["A", "B", "C", "D", "E"];
 export const MAX_IMPORTED = 200;
 
@@ -36,14 +36,16 @@ export function importedToRows(raw: unknown, userId: string): { ok: true; rows: 
         ? answers.filter((a) => options.some((o) => o.label === a)).slice(0, 1)
         : type === "true_false"
           ? answers.filter((a) => a === "C" || a === "E").slice(0, 1)
-          : [];
+          : type === "numeric"
+            ? answers.filter((a) => /^\d{1,3}$/.test(a)).map((a) => String(Number(a))).slice(0, 1)
+            : [];
     const image = str(item.image_path, 300);
     const finalType: QuestionType = type === "multiple_choice" && options.length < 2 ? "essay" : type;
     rows.push({
       type: finalType,
       statement: str(item.statement, 20000),
       options: finalType === "multiple_choice" ? options : [],
-      correct_answers: finalType === "essay" ? [] : correct,
+      correct_answers: finalType === "essay" || finalType === "lined" ? [] : correct,
       weight: 1,
       annulled: false,
       image_path: image && image.startsWith(`${userId}/`) && !image.includes("..") ? image : null,

@@ -6,7 +6,7 @@
  * e uma faixa no topo com aluno, avaliação, nota, acertos e data/hora.
  * Roda no navegador (canvas).
  */
-import { sheetLayout, type SheetQuestionSpec } from "@/lib/answer-sheet/layout";
+import { numericBubbleLabels, sheetLayout, type SheetQuestionSpec } from "@/lib/answer-sheet/layout";
 import { applyHomography, type Homography } from "@/lib/omr/homography";
 import { MULTIPLE_MARKS, UNCERTAIN, formatScore, type AnswerKeyItem, type GradeResult, type GivenAnswer } from "@/lib/grading/grading";
 
@@ -129,9 +129,13 @@ export function buildProof(input: ProofInput): HTMLCanvasElement {
   for (const q of grade.questions) {
     const bubbles = layout.bubbles.filter((b) => b.question === q.number);
     if (!bubbles.length) continue; // discursivas não estão no cartão
-    const last = bubbles[bubbles.length - 1];
     const keyItem = input.key.find((k) => k.number === q.number);
-    const accepted = new Set((keyItem?.accepted ?? []).map((a) => a.toUpperCase()));
+    const numeric = keyItem?.type === "numeric";
+    // Tipo B: o sinal ✓/✗ vai ao lado do alto do bloco; as bolhas certas são C/D/U do número.
+    const last = numeric ? { ...bubbles[bubbles.length - 1], y: bubbles[0].y } : bubbles[bubbles.length - 1];
+    const accepted = new Set(
+      numeric ? (keyItem?.accepted ?? []).flatMap((a) => numericBubbleLabels(a)) : (keyItem?.accepted ?? []).map((a) => a.toUpperCase()),
+    );
     const given = typeof q.given === "string" ? q.given.toUpperCase() : null;
     const marked = input.marked[q.number] ?? (given && given !== MULTIPLE_MARKS && given !== UNCERTAIN ? [given] : []);
     const signX = last.x + 5.5;

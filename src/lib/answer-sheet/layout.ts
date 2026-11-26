@@ -9,7 +9,7 @@
  */
 import { CODE_TOTAL_BITS } from "./code";
 
-export const LAYOUT_VERSION = 2; // v2: bolhas menores (3,3 mm)
+export const LAYOUT_VERSION = 3; // v2: bolhas menores (3,3 mm) · v3: Tipo B (centena/dezena/unidade)
 export const PAGE_W = 210;
 export const PAGE_H = 297;
 
@@ -37,6 +37,21 @@ export interface SheetQuestionSpec {
   labels: string[]; // ["A","B","C","D"] ou ["C","E"] (certo ou errado)
   /** Questão certo/errado: a letra vai dentro da bolha. */
   certoErrado?: boolean;
+  /** Tipo B (PAS): três colunas C/D/U com os algarismos 0–9; rótulos "C0".."U9". */
+  numeric?: boolean;
+}
+
+/** Linhas da grade que um bloco do Tipo B ocupa (cabeçalho C D U + 10 algarismos). */
+export const NUMERIC_ROWS = 9;
+const NUMERIC_PITCH = 4.9; // mm entre os algarismos
+export const NUMERIC_LABELS = ["C", "D", "U"].flatMap((p) => Array.from({ length: 10 }, (_, v) => `${p}${v}`));
+
+/** "42" → ["C0","D4","U2"] (bolhas da resposta certa). */
+export function numericBubbleLabels(value: string): string[] {
+  const t = value.replace(/\D/g, "");
+  if (!t || t.length > 3) return [];
+  const d = t.padStart(3, "0");
+  return [`C${d[0]}`, `D${d[1]}`, `U${d[2]}`];
 }
 
 export interface Bubble {
@@ -45,8 +60,10 @@ export interface Bubble {
   x: number;
   y: number;
   r: number;
-  /** Letra impressa dentro da bolha (questões certo/errado). */
+  /** Letra impressa dentro da bolha (questões certo/errado e Tipo B). */
   inner?: boolean;
+  /** Texto dentro da bolha, quando diferente do rótulo (Tipo B: o algarismo). */
+  text?: string;
 }
 
 export interface CodeCell {
@@ -74,6 +91,8 @@ export interface SheetLayout {
   bubbles: Bubble[];
   questionLabels: { number: number; x: number; y: number }[];
   columnHeaders: { label: string; x: number; y: number }[];
+  /** Letras C D U em cima de cada bloco do Tipo B. */
+  blockHeaders: { label: string; x: number; y: number }[];
   bubbleRadius: number;
 }
 
@@ -110,31 +129,59 @@ export function rollGridLayout(): RollBubble[] {
 }
 
 export function sheetLayout(questions: SheetQuestionSpec[]): SheetLayout {
-  if (questions.length > MAX_QUESTIONS) {
-    throw new Error(`O cartão-resposta comporta até ${MAX_QUESTIONS} questões objetivas.`);
+  const units = questions.reduce((n, q) => n + (q.numeric ? NUMERIC_ROWS : 1), 0);
+  if (questions.length > MAX_QUESTIONS || units > MAX_QUESTIONS) {
+    throw new Error(
+      questions.some((q) => q.numeric)
+        ? `O cartão-resposta não comporta tantas questões (cada Tipo B ocupa o espaço de ${NUMERIC_ROWS}). Divida a prova ou reduza as questões.`
+        : `O cartão-resposta comporta até ${MAX_QUESTIONS} questões objetivas.`,
+    );
   }
   const bubbles: Bubble[] = [];
   const questionLabels: SheetLayout["questionLabels"] = [];
   const columnHeaders: SheetLayout["columnHeaders"] = [];
-  const maxLabels = Math.max(0, ...questions.map((q) => q.labels.length));
+  const blockHeaders: SheetLayout["blockHeaders"] = [];
+  const maxLabels = Math.max(0, ...questions.filter((q) => !q.numeric).map((q) => q.labels.length));
   if (maxLabels > MAX_OPTIONS) throw new Error(`Máximo de ${MAX_OPTIONS} alternativas por questão.`);
 
-  questions.forEach((q, i) => {
-    const col = Math.floor(i / ROWS_PER_COLUMN);
-    const row = i % ROWS_PER_COLUMN;
+  // As questões descem pela coluna; um bloco do Tipo B ocupa NUMERIC_ROWS linhas
+  // e passa inteiro para a próxima coluna se não couber.
+  let col = 0;
+  let row = 0;
+  const mcColumns = new Set<number>();
+  for (const q of questions) {
+    const need = q.numeric ? NUMERIC_ROWS : 1;
+    if (row + need > ROWS_PER_COLUMN) {
+      col++;
+      row = 0;
+    }
     const baseX = GRID_LEFT + col * COLUMN_PITCH;
     const y = GRID_TOP + row * ROW_PITCH;
     questionLabels.push({ number: q.number, x: baseX, y });
-    q.labels.forEach((label, j) => {
-      bubbles.push({ question: q.number, label, x: baseX + 9 + j * OPTION_PITCH, y, r: BUBBLE_R, inner: q.certoErrado });
-    });
-  });
+    if (q.numeric) {
+      ["C", "D", "U"].forEach((p, j) => {
+        const x = baseX + 9 + j * OPTION_PITCH;
+        blockHeaders.push({ label: p, x, y });
+        for (let v = 0; v <= 9; v++) {
+          bubbles.push({ question: q.number, label: `${p}${v}`, text: String(v), x, y: y + 5 + v * NUMERIC_PITCH, r: BUBBLE_R, inner: true });
+        }
+      });
+    } else {
+      if (!q.certoErrado) mcColumns.add(col);
+      q.labels.forEach((label, j) => {
+        bubbles.push({ question: q.number, label, x: baseX + 9 + j * OPTION_PITCH, y, r: BUBBLE_R, inner: q.certoErrado });
+      });
+    }
+    row += need;
+  }
+  const usedColumns = col + 1;
 
-  const columns = Math.ceil(questions.length / ROWS_PER_COLUMN);
-  // Cabeçalho A–E só para múltipla escolha (certo/errado leva a letra dentro da bolha).
-  const mcMax = Math.max(0, ...questions.filter((q) => !q.certoErrado).map((q) => q.labels.length));
+  const columns = questions.length ? usedColumns : 0;
+  // Cabeçalho A–E só para múltipla escolha (certo/errado e Tipo B levam a letra dentro da bolha).
+  const mcMax = Math.max(0, ...questions.filter((q) => !q.certoErrado && !q.numeric).map((q) => q.labels.length));
   const headerLabels = "ABCDE".slice(0, mcMax).split("");
   for (let c = 0; c < columns; c++) {
+    if (!mcColumns.has(c)) continue;
     headerLabels.forEach((label, j) =>
       columnHeaders.push({ label, x: GRID_LEFT + c * COLUMN_PITCH + 9 + j * OPTION_PITCH, y: GRID_TOP - 7 }),
     );
@@ -150,20 +197,22 @@ export function sheetLayout(questions: SheetQuestionSpec[]): SheetLayout {
     bubbles,
     questionLabels,
     columnHeaders,
+    blockHeaders,
     bubbleRadius: BUBBLE_R,
   };
 }
 
-/** Questões que vão para o cartão: só as objetivas (múltipla escolha e certo/errado). */
+/** Questões que vão para o cartão: as objetivas (múltipla escolha, certo/errado e Tipo B). */
 export function sheetQuestionsFrom(
   questions: { position: number; type: string; options: { label: string }[] }[],
 ): SheetQuestionSpec[] {
   return questions
-    .filter((q) => q.type === "multiple_choice" || q.type === "true_false")
+    .filter((q) => q.type === "multiple_choice" || q.type === "true_false" || q.type === "numeric")
     .sort((a, b) => a.position - b.position)
     .map((q) => ({
       number: q.position,
-      labels: q.type === "true_false" ? ["C", "E"] : q.options.map((o) => o.label),
+      labels: q.type === "true_false" ? ["C", "E"] : q.type === "numeric" ? NUMERIC_LABELS : q.options.map((o) => o.label),
       ...(q.type === "true_false" ? { certoErrado: true } : {}),
+      ...(q.type === "numeric" ? { numeric: true } : {}),
     }));
 }

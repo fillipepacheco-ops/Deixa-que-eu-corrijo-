@@ -298,6 +298,44 @@ function questionBlocks(q: AssessmentQuestion, number: number): (Paragraph | Tab
         children: [new TextRun({ text: "(     ) Certo          (     ) Errado", size: SIZE, font: FONT })],
       }),
     );
+  } else if (q.type === "numeric") {
+    blocks.push(
+      new Paragraph({
+        spacing: { ...LINE_15 },
+        children: [
+          new TextRun({ text: "Tipo B: marque a resposta no cartão-resposta (centena, dezena e unidade).", italics: true, size: SIZE - 4, color: GRAY, font: FONT }),
+        ],
+      }),
+    );
+  } else if (q.type === "lined") {
+    // Tipo D: quadro com 10 linhas numeradas
+    const border = { style: BorderStyle.SINGLE, size: 6, color: "1F2A24" };
+    const thin = { style: BorderStyle.SINGLE, size: 4, color: "B8C2BC" };
+    const NUM = 520;
+    blocks.push(
+      new Table({
+        width: { size: COL_W, type: WidthType.DXA },
+        columnWidths: [NUM, COL_W - NUM],
+        borders: { top: border, bottom: border, left: border, right: border, insideHorizontal: thin, insideVertical: border },
+        rows: Array.from(
+          { length: 10 },
+          (_, i) =>
+            new TableRow({
+              cantSplit: true,
+              height: { value: 440, rule: HeightRule.EXACT },
+              children: [
+                new TableCell({
+                  width: { size: NUM, type: WidthType.DXA },
+                  margins: { left: 40, right: 40 },
+                  verticalAlign: "center",
+                  children: [new Paragraph({ alignment: AlignmentType.CENTER, keepNext: i < 9, children: [new TextRun({ text: String(i + 1), size: 16, color: GRAY, font: FONT })] })],
+                }),
+                new TableCell({ width: { size: COL_W - NUM, type: WidthType.DXA }, children: [new Paragraph({ keepNext: i < 9, children: [] })] }),
+              ],
+            }),
+        ),
+      }),
+    );
   } else {
     // Linhas para resposta: tabela só com bordas inferiores (parágrafos com
     // a mesma borda seriam agrupados numa caixa só pelo Word).

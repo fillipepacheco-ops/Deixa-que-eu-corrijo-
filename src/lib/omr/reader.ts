@@ -45,6 +45,21 @@ export interface ReadResult {
   homography?: Homography;
 }
 
+/**
+ * Tipo B: um algarismo por coluna (C, D, U) → "042".
+ * Tudo em branco = null; duas marcas na mesma coluna = "*"; coluna sem marca = "_".
+ */
+export function numericAnswer(marked: string[]): string | null {
+  if (!marked.length) return null;
+  let out = "";
+  for (const p of ["C", "D", "U"]) {
+    const m = marked.filter((l) => l[0] === p);
+    if (m.length > 1) return MULTIPLE_MARKS;
+    out += m.length ? m[0].slice(1) : "_";
+  }
+  return out;
+}
+
 /** Converte RGBA (canvas) em tons de cinza. */
 export function toGray(rgba: Uint8ClampedArray, width: number, height: number): GrayImage {
   const data = new Uint8Array(width * height);
@@ -245,6 +260,7 @@ export function readAnswerSheet(img: GrayImage, questions: SheetQuestionSpec[]):
 
     let answer: string | null;
     if (doubtful.length > 0) answer = UNCERTAIN;
+    else if (q.numeric) answer = numericAnswer(marked);
     else if (marked.length === 0) answer = null;
     else if (marked.length === 1) answer = marked[0];
     else answer = MULTIPLE_MARKS;
