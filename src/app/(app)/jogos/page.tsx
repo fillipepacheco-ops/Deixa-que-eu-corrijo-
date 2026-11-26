@@ -113,9 +113,9 @@ export default async function JogosPage({ searchParams }: { searchParams: Promis
                   Tempo por questão
                 </label>
                 <select className="field" id="time_limit" name="time_limit" defaultValue="30">
-                  {[10, 20, 30, 45, 60, 90, 120, 180].map((s) => (
+                  {[10, 20, 30, 45, 60, 90, 120, 180, 240, 300, 360, 420, 480].map((s) => (
                     <option key={s} value={s}>
-                      {s < 60 ? `${s} segundos` : `${s / 60} minuto${s >= 120 ? "s" : ""}`}
+                      {s < 60 ? `${s} segundos` : s % 60 ? `${Math.floor(s / 60)} min e ${s % 60} s` : `${s / 60} minuto${s >= 120 ? "s" : ""}`}
                     </option>
                   ))}
                 </select>

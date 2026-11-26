@@ -19,7 +19,7 @@ export async function createGame(assessmentId: string, _: State, formData: FormD
   const data = await loadAssessment(supabase, assessmentId);
   if (!data) return { error: "Avaliação não encontrada." };
   const teamSize = Math.min(3, Math.max(1, Number(formData.get("team_size")) || 1));
-  const timeLimit = Math.min(300, Math.max(5, Number(formData.get("time_limit")) || 20));
+  const timeLimit = Math.min(480, Math.max(5, Number(formData.get("time_limit")) || 20)); // até 8 minutos
 
   const playable = [...data.questions]
     .sort((a, b) => a.position - b.position)

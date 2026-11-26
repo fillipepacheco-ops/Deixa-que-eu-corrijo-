@@ -36,8 +36,12 @@ export function TimerRing({ seconds, total, size = 96 }: { seconds: number; tota
           style={{ transition: "stroke-dashoffset 0.25s linear" }}
         />
       </svg>
-      <span className={`absolute font-black tabular-nums ${urgent ? "text-[#e21b3c]" : "text-violet-900"}`} style={{ fontSize: size * 0.36 }}>
-        {Math.ceil(seconds)}
+      <span
+        className={`absolute font-black tabular-nums ${urgent ? "text-[#e21b3c]" : "text-violet-900"}`}
+        style={{ fontSize: size * (seconds >= 60 ? 0.26 : 0.36) }}
+      >
+        {/* acima de 1 minuto: 7:45 */}
+        {seconds >= 60 ? `${Math.floor(Math.ceil(seconds) / 60)}:${String(Math.ceil(seconds) % 60).padStart(2, "0")}` : Math.ceil(seconds)}
       </span>
     </div>
   );

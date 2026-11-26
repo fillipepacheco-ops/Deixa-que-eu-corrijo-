@@ -34,7 +34,7 @@ create table if not exists game_questions (
   statement text not null,
   options jsonb not null default '[]'::jsonb,
   image_url text,
-  time_limit smallint not null default 20 check (time_limit between 5 and 300),
+  time_limit smallint not null default 20 check (time_limit between 5 and 480),
   primary key (game_id, idx)
 );
 
