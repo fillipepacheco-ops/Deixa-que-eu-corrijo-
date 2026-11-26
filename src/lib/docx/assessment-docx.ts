@@ -7,6 +7,7 @@
  * Cada questão fica "presa" (manter com o próximo) para não ser cortada
  * entre páginas quando o professor editar no Word.
  */
+import { tidyText } from "@/lib/assessment/tidy-text";
 import {
   AlignmentType,
   BorderStyle,
@@ -200,7 +201,7 @@ function questionBlocks(q: AssessmentQuestion, number: number): (Paragraph | Tab
   }
   blocks.push(new Paragraph({ ...keep, spacing: { before: 240, after: 80 }, children: heading }));
 
-  const paragraphs = (q.statement || "").split(/\r?\n/).filter((p) => p.trim() !== "");
+  const paragraphs = tidyText(q.statement).split(/\n/).filter((p) => p.trim() !== "");
   const stmt = paragraphs.length ? paragraphs : [" "];
   stmt.forEach((p, i) =>
     blocks.push(
@@ -285,7 +286,7 @@ function questionBlocks(q: AssessmentQuestion, number: number): (Paragraph | Tab
           children: [
             new TextRun({ text: `(${opt.label})`, bold: true, size: SIZE, color: MID, font: FONT }),
             new TextRun({ text: "\t", size: SIZE, font: FONT }),
-            ...markupToDocx(opt.text, { size: SIZE, font: FONT }),
+            ...markupToDocx(tidyText(opt.text), { size: SIZE, font: FONT }),
           ],
         }),
       );

@@ -7,6 +7,7 @@
  *   próxima coluna/página (imagem e tabela ficam junto do enunciado);
  * - só quebra uma questão se ela sozinha for maior que uma coluna inteira.
  */
+import { tidyText } from "@/lib/assessment/tidy-text";
 import { PDFDocument, StandardFonts, rgb, type PDFImage, type PDFPage } from "pdf-lib";
 import type { Assessment, AssessmentQuestion, PdfTemplate } from "@/lib/models/types";
 import { A4, BRAND, drawLine, drawTextTop, formatDateBR, mm, sanitize, wrapLines, wrapText } from "./common";
@@ -183,7 +184,7 @@ export async function generateAssessmentPdf(input: AssessmentPdfInput): Promise<
     }
 
     // Enunciado.
-    const statement = q.statement?.trim() || "(enunciado não preenchido)";
+    const statement = tidyText(q.statement) || "(enunciado não preenchido)";
     // Enunciado com fórmulas (expoente, fração, raiz, símbolos).
     const stLines = layoutRich(statement, { fonts: rich, size: fs, maxWidth: textW, lineHeight: cfg.lineHeight, justify: cfg.justify });
     stLines.forEach((line, i) => {
@@ -266,7 +267,7 @@ export async function generateAssessmentPdf(input: AssessmentPdfInput): Promise<
       const optIndent = fs * 2.2;
       q.options.forEach((opt, oi) => {
         const lastPair = oi === q.options.length - 1 && oi > 1; // a última alternativa não fica sozinha
-        const lines = layoutRich(opt.text, { fonts: rich, size: fs, maxWidth: textW - optIndent, lineHeight: cfg.lineHeight, justify: cfg.justify });
+        const lines = layoutRich(tidyText(opt.text), { fonts: rich, size: fs, maxWidth: textW - optIndent, lineHeight: cfg.lineHeight, justify: cfg.justify });
         lines.forEach((line, i) => {
           pieces.push({
             h: line.height,
@@ -526,8 +527,11 @@ export async function generateAssessmentPdf(input: AssessmentPdfInput): Promise<
 
     if (total > room && cursor > areaTop) {
       const first = segH(segments[0]);
-      // pouco espaço sobrando, ou nem o começo da questão cabe: começa na próxima coluna
-      if (room < first || room < Math.min(lh * 4, columnH() * 0.12)) nextColumn();
+      const lastColumn = col === cfg.columns - 1;
+      // Nunca começa no pé da página e continua na outra página: vai inteira para a próxima
+      // (só divide entre páginas se a questão for maior que uma coluna inteira).
+      // Entre as colunas da mesma página pode dividir, se ficar um bom pedaço.
+      if ((lastColumn && total <= columnH()) || room < first || room < Math.min(lh * 4, columnH() * 0.12)) nextColumn();
     }
     questionPages[g.number] = pages.length;
 

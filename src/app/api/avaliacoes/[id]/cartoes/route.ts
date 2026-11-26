@@ -12,7 +12,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
   try {
     const logoRes = await fetch(new URL("/brand/logo.png", request.url)).catch(() => null);
     const appLogo = logoRes?.ok ? new Uint8Array(await logoRes.arrayBuffer()) : null;
-    const bytes = await buildPrintPdf(supabase, id, { doc: "cartao", studentId: new URL(request.url).searchParams.get("aluno"), appLogo });
+    const bytes = await buildPrintPdf(supabase, id, { doc: "cartao", studentIds: (new URL(request.url).searchParams.get("aluno") ?? "").split(",").filter(Boolean), appLogo });
     return new NextResponse(toArrayBuffer(bytes), {
       headers: { "Content-Type": "application/pdf", "Content-Disposition": "inline", "Cache-Control": "no-store" },
     });

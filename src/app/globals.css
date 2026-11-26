@@ -23,6 +23,25 @@ html {
   color: var(--color-ink);
   background: #f7fbf4;
   -webkit-tap-highlight-color: transparent;
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+}
+
+/* A tela nunca fica mais larga que o aparelho (nada "sobra" para o lado). */
+html,
+body {
+  max-width: 100%;
+  overflow-x: clip;
+}
+
+/* iPhone/iPad dão zoom sozinhos ao tocar num campo com letra menor que 16px
+   e a tela fica "fora do tamanho". Com 16px isso não acontece. */
+@media (pointer: coarse) {
+  input:not([type="checkbox"]):not([type="radio"]):not([type="range"]),
+  select,
+  textarea {
+    font-size: 16px !important;
+  }
 }
 
 /* Campos de formulário consistentes (camada components: utilitários podem sobrescrever) */

@@ -25,21 +25,37 @@ const charsetCache = new WeakMap<PDFFont, Set<number>>();
  * As fontes padrão do PDF usam WinAnsi (todo o português funciona).
  * Símbolos fora dele são trocados por equivalentes para o PDF nunca falhar.
  */
+/**
+ * Caractere que a fonte não tem: tenta a letra sem acento (ő → o), some com
+ * marcas invisíveis (acento "solto" do iPhone, espaço de largura zero, emoji)
+ * e só em último caso vira "?".
+ */
+export function fallbackChar(ch: string, has: (c: string) => boolean): string {
+  if (/[\p{M}\p{Cf}\u{FE00}-\u{FE0F}]/u.test(ch)) return "";
+  if (/\p{Zs}/u.test(ch)) return " ";
+  if (/\p{Extended_Pictographic}/u.test(ch)) return "";
+  const base = ch.normalize("NFD").replace(/\p{M}/gu, "");
+  if (base && base !== ch && [...base].every(has)) return base;
+  return "?";
+}
+
 export function sanitize(font: PDFFont, text: string): string {
   let set = charsetCache.get(font);
   if (!set) {
     set = new Set(font.getCharacterSet());
     charsetCache.set(font, set);
   }
+  const has = (c: string) => set!.has(c.codePointAt(0)!);
   const replacements: Record<string, string> = {
     "≤": "<=", "≥": ">=", "≠": "!=", "√": "raiz ", "π": "pi", "∞": "infinito",
-    "→": "->", "←": "<-", "−": "-", " ": " ", "\t": "    ",
+    "→": "->", "←": "<-", "−": "-", "\t": " ",
   };
   let out = "";
-  for (const ch of text) {
-    if (set.has(ch.codePointAt(0)!)) out += ch;
+  // NFC junta letra + acento digitados separados (ex.: "C" + "̧" → "Ç")
+  for (const ch of text.normalize("NFC")) {
+    if (has(ch)) out += ch;
     else if (replacements[ch] !== undefined) out += replacements[ch];
-    else out += "?";
+    else out += fallbackChar(ch, has);
   }
   return out;
 }
@@ -135,7 +151,7 @@ export function drawLine(
   const wordsW = words.reduce((s, w) => s + opts.font.widthOfTextAtSize(w, opts.size), 0);
   const gap = (opts.width - wordsW) / (words.length - 1);
   // Linha muito curta (gap exagerado): melhor não justificar.
-  if (gap > opts.size * 1.6) {
+  if (gap > opts.size * 3.5 && words.length < 4) {
     drawTextTop(page, line.text, opts);
     return;
   }

@@ -5,17 +5,22 @@ import { createClient } from "@/lib/supabase/server";
 import { Card, EmptyState, PageHeader } from "@/components/ui/PageHeader";
 import { buttonClass } from "@/components/ui/button";
 import { formatDateBR } from "@/lib/assessment/header";
+import { groupByTerm } from "@/lib/assessment/term";
+import { TermFilter, TermHeading, visibleGroups } from "@/components/terms/TermFilter";
 
 export const metadata: Metadata = { title: "Correção" };
 
-export default async function CorrecaoPage() {
+export default async function CorrecaoPage({ searchParams }: { searchParams: Promise<{ bim?: string }> }) {
+  const { bim } = await searchParams;
   const supabase = await createClient();
   const { data } = await supabase
     .from("assessments")
-    .select("id, title, applied_on, class_id, classes(name, students(count)), submissions(count)")
+    .select("*, classes(name, students(count)), submissions(count)")
     .order("applied_on", { ascending: false, nullsFirst: false })
     .order("created_at", { ascending: false });
-  const items = data ?? [];
+  const items = (data ?? []) as ({ id: string; title: string; applied_on: string | null; created_at: string; term?: number | null } & Record<string, unknown>)[];
+  const groups = groupByTerm(items);
+  const { current, shown } = visibleGroups(groups, bim);
 
   return (
     <>
@@ -31,8 +36,13 @@ export default async function CorrecaoPage() {
           }
         />
       ) : (
+        <>
+        <TermFilter groups={groups} current={current} basePath="/correcao" />
+        {shown.map((g) => (
+        <section key={g.key}>
+        <TermHeading label={g.label} count={g.items.length} />
         <Card className="divide-y divide-line">
-          {items.map((a) => {
+          {g.items.map((a) => {
             const turma = a.classes as unknown as { name: string; students: { count: number }[] } | null;
             const total = turma?.students?.[0]?.count ?? 0;
             const done = (a.submissions as unknown as { count: number }[])?.[0]?.count ?? 0;
@@ -63,6 +73,9 @@ export default async function CorrecaoPage() {
             );
           })}
         </Card>
+        </section>
+        ))}
+        </>
       )}
     </>
   );

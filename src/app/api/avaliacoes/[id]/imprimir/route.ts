@@ -8,7 +8,7 @@ export const maxDuration = 60;
 
 /**
  * /api/avaliacoes/:id/imprimir?doc=prova|cartao|kit[&aluno=<id>][&branco=1]
- * Turma toda (sem "aluno") ou um aluno só.
+ * Turma toda (sem "aluno") ou só os alunos escolhidos (aluno=id1,id2,...).
  */
 export async function GET(request: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -18,7 +18,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
   try {
     const logoRes = doc === "prova" ? null : await fetch(new URL("/brand/logo.png", request.url)).catch(() => null);
     const appLogo = logoRes?.ok ? new Uint8Array(await logoRes.arrayBuffer()) : null;
-    const bytes = await buildPrintPdf(supabase, id, { doc, studentId: q.get("aluno"), blank: q.get("branco") === "1", appLogo });
+    const bytes = await buildPrintPdf(supabase, id, { doc, studentIds: (q.get("aluno") ?? "").split(",").filter(Boolean), blank: q.get("branco") === "1", appLogo });
     return new NextResponse(toArrayBuffer(bytes), {
       headers: { "Content-Type": "application/pdf", "Content-Disposition": "inline", "Cache-Control": "no-store" },
     });

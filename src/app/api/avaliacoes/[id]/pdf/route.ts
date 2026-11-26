@@ -15,7 +15,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
   const q = new URL(request.url).searchParams;
   const supabase = await createClient();
   try {
-    const bytes = await buildPrintPdf(supabase, id, { doc: "prova", blank: q.get("modo") !== "alunos", studentId: q.get("aluno") });
+    const bytes = await buildPrintPdf(supabase, id, { doc: "prova", blank: q.get("modo") !== "alunos", studentIds: (q.get("aluno") ?? "").split(",").filter(Boolean) });
     return new NextResponse(toArrayBuffer(bytes), {
       headers: { "Content-Type": "application/pdf", "Content-Disposition": "inline", "Cache-Control": "no-store" },
     });

@@ -1,3 +1,4 @@
+import { termOf } from "@/lib/assessment/term";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { gradeSubmission, type GivenAnswer } from "@/lib/grading/grading";
 import { analyzeQuestions, summarizeScores } from "@/lib/grading/stats";
@@ -114,6 +115,7 @@ export interface ClassAssessmentScores {
   applied_on: string | null;
   max_score: number;
   school: string;
+  term: number | null;
   scores: Map<string, number>; // aluno → nota
 }
 
@@ -145,6 +147,7 @@ export async function loadClassResults(supabase: SupabaseClient, classId: string
       applied_on: r.assessment.applied_on,
       max_score: r.assessment.max_score,
       school: r.school,
+      term: termOf(r.assessment),
       scores: new Map(r.rows.filter((x) => x.score !== null).map((x) => [x.id, x.score as number])),
     }));
   // escola mais frequente entre as avaliações da turma

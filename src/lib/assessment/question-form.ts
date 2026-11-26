@@ -25,7 +25,7 @@ export interface ParsedQuestion {
 
 type FormLike = { get(name: string): FormDataEntryValue | null; getAll(name: string): FormDataEntryValue[] };
 
-const str = (v: FormDataEntryValue | null) => (typeof v === "string" ? v : "").trim();
+const str = (v: FormDataEntryValue | null) => (typeof v === "string" ? v : "").normalize("NFC").trim();
 
 export function parseQuestionForm(form: FormLike): { ok: true; data: ParsedQuestion } | { ok: false; error: string } {
   const type = str(form.get("type")) as QuestionType;

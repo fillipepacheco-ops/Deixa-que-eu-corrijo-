@@ -36,6 +36,7 @@ export default async function NotasTurmaPage({ params }: { params: Promise<{ cla
             title: a.title,
             applied_on: a.applied_on,
             max_score: a.max_score,
+            term: a.term,
             scores: Object.fromEntries(a.scores),
           }))}
         />

@@ -9,7 +9,7 @@ import type { QuestionType } from "@/lib/models/types";
 import type { FormState } from "./classes";
 
 function readHeader(formData: FormData) {
-  const s = (k: string) => String(formData.get(k) ?? "").trim();
+  const s = (k: string) => String(formData.get(k) ?? "").normalize("NFC").trim();
   const max = Number(s("max_score").replace(",", ".") || "10");
   return {
     title: s("title"),
@@ -22,8 +22,18 @@ function readHeader(formData: FormData) {
     applied_on: s("applied_on") || null,
     instructions: s("instructions") || null,
     max_score: Number.isFinite(max) && max > 0 ? max : 10,
+    // "" = automático (pelo título ou pela data)
+    term: ["1", "2", "3", "4"].includes(s("term")) ? Number(s("term")) : null,
   };
 }
+
+/** Banco ainda sem a coluna "term" (atualização 0005 não rodada): salva sem o bimestre. */
+const missingTerm = (e: { message: string } | null) => !!e && /\bterm\b/.test(e.message) && /(column|schema cache)/i.test(e.message);
+const withoutTerm = <T extends { term?: number | null }>(d: T) => {
+  const copy = { ...d };
+  delete copy.term;
+  return copy;
+};
 
 /** Escola e logo usadas ficam como padrão para as próximas avaliações. */
 async function rememberSchool(data: { school_name: string | null; school_logo_path: string | null }) {
@@ -65,12 +75,19 @@ export async function createAssessment(_: FormState, formData: FormData): Promis
   if (imported && !imported.ok) return { error: imported.error };
   // Disciplina e série em branco: usa as da turma escolhida.
   await fillFromClass(data);
-  const { data: row, error } = await supabase
+  let { data: row, error } = await supabase
     .from("assessments")
     .insert({ ...data, template: "larga_escala" })
     .select("id")
     .single();
-  if (error) return { error: `Não foi possível criar a avaliação. (${error.message})` };
+  if (missingTerm(error)) {
+    ({ data: row, error } = await supabase
+      .from("assessments")
+      .insert({ ...withoutTerm(data), template: "larga_escala" })
+      .select("id")
+      .single());
+  }
+  if (!row) return { error: `Não foi possível criar a avaliação. (${error?.message ?? "erro desconhecido"})` };
   await rememberSchool(data);
   if (imported?.ok) {
     const { error: qErr } = await supabase
@@ -90,7 +107,8 @@ export async function updateAssessment(id: string, _: FormState, formData: FormD
   if (!data.title) return { error: "A avaliação precisa de um título." };
   await fillFromClass(data);
   const supabase = await createClient();
-  const { error } = await supabase.from("assessments").update(data).eq("id", id);
+  let { error } = await supabase.from("assessments").update(data).eq("id", id);
+  if (missingTerm(error)) ({ error } = await supabase.from("assessments").update(withoutTerm(data)).eq("id", id));
   if (error) return { error: `Não foi possível salvar. (${error.message})` };
   await rememberSchool(data);
   revalidatePath(`/avaliacoes/${id}`);

@@ -13,6 +13,7 @@ export interface ClassBoardAssessment {
   title: string;
   applied_on: string | null;
   max_score: number;
+  term: number | null;
   scores: Record<string, number>;
 }
 
@@ -62,6 +63,7 @@ export function ClassBoard({
   }, [storeKey, selected, combine]);
 
   const chosen = assessments.filter((a) => selected.includes(a.id));
+  const terms = [...new Set(assessments.map((a) => a.term).filter((t): t is number => !!t))].sort();
   const ordered = useMemo(() => sortStudents(students, fmt.order), [students, fmt.order]);
   const num = (v: number) => formatRaw(v, fmt.decimal);
   const results = ordered.map((s) => combineScores(chosen.map((a) => ({ score: a.scores[s.id] ?? null, max: a.max_score })), combine, fmt));
@@ -88,6 +90,21 @@ export function ClassBoard({
     <div className="space-y-5">
       <section className="rounded-2xl border border-line bg-white p-4 sm:p-5">
         <h2 className="text-[17px] font-extrabold text-brand-900">1. Quais avaliações entram?</h2>
+        {terms.length > 0 && (
+          <div className="mt-2 flex flex-wrap gap-2">
+            <span className="self-center text-[13px] text-muted">Marcar o bimestre:</span>
+            {terms.map((t) => (
+              <button
+                key={t}
+                type="button"
+                onClick={() => setSelected(assessments.filter((a) => a.term === t).map((a) => a.id))}
+                className="rounded-full border border-line bg-white px-3 py-1.5 text-[13px] font-bold text-brand-900 hover:border-brand-200 active:scale-95"
+              >
+                {t}º bimestre
+              </button>
+            ))}
+          </div>
+        )}
         <div className="mt-3 grid gap-2 sm:grid-cols-2">
           {assessments.map((a) => (
             <label key={a.id} className="flex items-center gap-3 rounded-xl border border-line px-3 py-3 has-checked:border-brand-500 has-checked:bg-brand-50/60">

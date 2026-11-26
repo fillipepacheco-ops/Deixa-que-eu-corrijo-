@@ -4,17 +4,23 @@ import { Eye, FilePlus2, FileUp, Pencil } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { Card, EmptyState, PageHeader } from "@/components/ui/PageHeader";
 import { buttonClass } from "@/components/ui/button";
+import { groupByTerm } from "@/lib/assessment/term";
+import { TermFilter, TermHeading, visibleGroups } from "@/components/terms/TermFilter";
 import { formatDateBR } from "@/lib/assessment/header";
 
 export const metadata: Metadata = { title: "Avaliações" };
 
-export default async function AvaliacoesPage() {
+export default async function AvaliacoesPage({ searchParams }: { searchParams: Promise<{ bim?: string }> }) {
+  const { bim } = await searchParams;
   const supabase = await createClient();
   const { data } = await supabase
     .from("assessments")
-    .select("id, title, subject, applied_on, created_at, classes(name), assessment_questions(count)")
+    .select("*, classes(name), assessment_questions(count)")
+    .order("applied_on", { ascending: false, nullsFirst: false })
     .order("created_at", { ascending: false });
-  const items = data ?? [];
+  const items = (data ?? []) as ({ id: string; title: string; subject: string | null; applied_on: string | null; created_at: string; term?: number | null } & Record<string, unknown>)[];
+  const groups = groupByTerm(items);
+  const { current, shown } = visibleGroups(groups, bim);
 
   return (
     <>
@@ -48,8 +54,13 @@ export default async function AvaliacoesPage() {
           }
         />
       ) : (
+        <>
+        <TermFilter groups={groups} current={current} basePath="/avaliacoes" />
+        {shown.map((g) => (
+        <section key={g.key}>
+        <TermHeading label={g.label} count={g.items.length} />
         <Card className="divide-y divide-line">
-          {items.map((a) => {
+          {g.items.map((a) => {
             const n = (a.assessment_questions as unknown as { count: number }[])?.[0]?.count ?? 0;
             const turma = (a.classes as unknown as { name: string } | null)?.name;
             return (
@@ -75,6 +86,9 @@ export default async function AvaliacoesPage() {
             );
           })}
         </Card>
+        </section>
+        ))}
+        </>
       )}
     </>
   );

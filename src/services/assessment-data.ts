@@ -46,6 +46,7 @@ export function toAssessment(row: AssessmentRow): Assessment {
     template: row.template,
     max_score: Number(row.max_score),
     annul_policy: row.annul_policy,
+    term: (row as { term?: number | null }).term ?? null,
   };
 }
 

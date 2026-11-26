@@ -7,7 +7,7 @@
  */
 import { rgb, type PDFFont, type PDFPage } from "pdf-lib";
 import { parseMath, type MathNode } from "@/lib/math/parse";
-import { A4, BRAND } from "./common";
+import { A4, BRAND, fallbackChar } from "./common";
 
 export interface RichFonts {
   regular: PDFFont;
@@ -42,14 +42,15 @@ function has(font: PDFFont, ch: string) {
 /** Divide o texto em trechos por fonte (Helvetica ou Symbol). */
 function runs(text: string, fonts: RichFonts): { font: PDFFont; s: string }[] {
   const out: { font: PDFFont; s: string }[] = [];
-  for (const raw of text) {
+  for (const raw of text.normalize("NFC")) {
     let ch = raw;
     let font = fonts.regular;
     if (!has(fonts.regular, ch)) {
       if (has(fonts.symbol, ch)) font = fonts.symbol;
       else {
-        ch = FALLBACK[ch] ?? "?";
+        ch = FALLBACK[ch] ?? fallbackChar(ch, (c) => has(fonts.regular, c));
         if (ch.length === 1 && !has(fonts.regular, ch)) ch = "?";
+        if (!ch) continue;
       }
     }
     const last = out[out.length - 1];
@@ -239,7 +240,8 @@ export function layoutRich(
       let gap = space;
       if (justify && !last && ws.length > 1) {
         const g = (maxWidth - sum) / (ws.length - 1);
-        if (g <= size * 1.6) gap = g;
+        // justifica sempre, menos em linha quase vazia (1–2 palavras enormes)
+        if (g <= size * 3.5 || ws.length >= 4) gap = g;
       }
       lines.push({
         height,

@@ -14,6 +14,9 @@ export const viewport: Viewport = {
   themeColor: "#0b3a1e",
   width: "device-width",
   initialScale: 1,
+  // sem zoom automático ao tocar nos campos (a pinça para ampliar continua funcionando)
+  maximumScale: 1,
+  viewportFit: "cover",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

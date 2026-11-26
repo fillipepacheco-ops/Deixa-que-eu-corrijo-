@@ -61,6 +61,8 @@ export interface Assessment {
   template: PdfTemplate;
   max_score: number;
   annul_policy: AnnulPolicy;
+  /** Bimestre escolhido pelo professor (1–4); null = automático. */
+  term?: number | null;
 }
 
 export const CATEGORY_LABELS: Record<CouncilCategory, string> = {

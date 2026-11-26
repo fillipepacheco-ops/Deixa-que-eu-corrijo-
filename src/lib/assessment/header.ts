@@ -35,14 +35,15 @@ export function parseInstructions(text: string | null | undefined): string[] {
 }
 
 export function examHeader(a: Assessment): ExamHeader {
-  const instructions = parseInstructions(a.instructions);
+  const instructions = parseInstructions(a.instructions).map((t) => t.normalize("NFC"));
+  const t = (v: string | null | undefined) => (v ?? "").normalize("NFC").trim();
   return {
-    schoolName: a.school_name?.trim() ?? "",
-    title: a.title.trim(),
-    subject: a.subject?.trim() ?? "",
-    gradeLevel: a.grade_level?.trim() ?? "",
-    className: a.class_name?.trim() ?? "",
-    teacherName: a.teacher_name?.trim() ?? "",
+    schoolName: t(a.school_name),
+    title: t(a.title),
+    subject: t(a.subject),
+    gradeLevel: t(a.grade_level),
+    className: t(a.class_name),
+    teacherName: t(a.teacher_name),
     appliedOn: a.applied_on,
     maxScore: a.max_score,
     instructions: instructions.length ? instructions : DEFAULT_INSTRUCTIONS,

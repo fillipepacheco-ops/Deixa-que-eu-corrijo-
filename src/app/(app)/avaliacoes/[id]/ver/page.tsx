@@ -7,6 +7,9 @@ import { PdfViewer } from "@/components/viewer/PdfViewer";
 import { FileButton } from "@/components/assessments/FileButton";
 import { buttonClass } from "@/components/ui/button";
 import { fileSlug } from "@/lib/assessment/header";
+import { PrintPanel } from "@/components/assessments/PrintPanel";
+import { loadAssessment, loadStudents } from "@/services/assessment-data";
+import { sheetQuestionsFrom } from "@/lib/answer-sheet/layout";
 
 export const metadata: Metadata = { title: "Ver prova" };
 
@@ -20,8 +23,10 @@ export default async function VerProvaPage({
   const { id } = await params;
   const { doc } = await searchParams;
   const supabase = await createClient();
-  const { data: a } = await supabase.from("assessments").select("id, title").eq("id", id).maybeSingle();
-  if (!a) notFound();
+  const data = await loadAssessment(supabase, id);
+  if (!data) notFound();
+  const a = data.assessment;
+  const students = await loadStudents(supabase, data.row.class_id);
 
   const isCard = doc === "cartao";
   const src = isCard ? `/api/avaliacoes/${id}/cartoes` : `/api/avaliacoes/${id}/pdf?modo=branco`;
@@ -63,11 +68,26 @@ export default async function VerProvaPage({
             title="Imprimir ou salvar"
             subtitle="Gera o arquivo desta visualização"
           />
+          <a href="#imprimir" className="mt-2 block text-center text-[13px] font-semibold text-brand-700 underline">
+            Imprimir só para alguns alunos
+          </a>
         </div>
       </div>
 
       <div className="rounded-3xl bg-[#e9eee9] px-2 py-6 sm:px-6">
         <PdfViewer key={src} src={src} />
+      </div>
+
+      {/* Imprimir para a turma toda ou só para os alunos escolhidos */}
+      <div className="mt-6">
+        <PrintPanel
+          assessmentId={id}
+          slug={slug}
+          students={students}
+          className={a.class_name ?? null}
+          hasQuestions={data.questions.length > 0}
+          hasObjective={sheetQuestionsFrom(data.questions).length > 0}
+        />
       </div>
     </>
   );

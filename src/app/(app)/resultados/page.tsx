@@ -6,6 +6,8 @@ import { Card, EmptyState, PageHeader } from "@/components/ui/PageHeader";
 import { buttonClass } from "@/components/ui/button";
 import { formatDateBR } from "@/lib/assessment/header";
 import { schoolKey } from "@/lib/results/diary";
+import { groupByTerm } from "@/lib/assessment/term";
+import { TermFilter, visibleGroups } from "@/components/terms/TermFilter";
 
 export const metadata: Metadata = { title: "Resultados" };
 
@@ -18,16 +20,23 @@ interface Item {
   class_id: string | null;
   classes: { name: string; students: { count: number }[] } | null;
   submissions: { score: number | null }[];
+  created_at: string;
+  term?: number | null;
 }
 
-export default async function ResultadosPage() {
+export default async function ResultadosPage({ searchParams }: { searchParams: Promise<{ bim?: string }> }) {
+  const { bim } = await searchParams;
   const supabase = await createClient();
   const { data } = await supabase
     .from("assessments")
-    .select("id, title, applied_on, max_score, school_name, class_id, classes(name, students(count)), submissions(score)")
+    .select("*, classes(name, students(count)), submissions(score)")
     .order("applied_on", { ascending: false, nullsFirst: false })
     .order("created_at", { ascending: false });
-  const items = (data ?? []) as unknown as Item[];
+  const all = (data ?? []) as unknown as Item[];
+  // filtro por bimestre
+  const termGroups = groupByTerm(all);
+  const { current, shown } = visibleGroups(termGroups, bim);
+  const items = shown.flatMap((g) => g.items);
 
   // agrupa por escola (cada escola tem o seu formato de diário)
   const groups = new Map<string, Item[]>();
@@ -47,7 +56,7 @@ export default async function ResultadosPage() {
         title="Resultados"
         description="As notas de cada prova, organizadas e no formato do diário de cada escola — prontas para copiar, imprimir ou lançar."
       />
-      {items.length === 0 ? (
+      {all.length === 0 ? (
         <EmptyState
           title="Ainda não há resultados"
           text="Crie uma avaliação e corrija os cartões pela câmera. As notas aparecem aqui."
@@ -59,13 +68,18 @@ export default async function ResultadosPage() {
         />
       ) : (
         <div className="space-y-7">
+          <TermFilter groups={termGroups} current={current} basePath="/resultados" />
           {schools.map(([school, list]) => (
             <section key={school || "-"}>
               <h2 className="mb-2.5 flex items-center gap-2 text-[15px] font-extrabold text-brand-900">
                 <School size={18} className="text-brand-700" /> {school || "Escola não informada"}
               </h2>
               <Card className="divide-y divide-line">
-                {list.map((a) => {
+                {groupByTerm(list).flatMap((tg) => [
+                  <p key={`h-${tg.key}`} className="bg-brand-50/60 px-5 py-1.5 text-[11px] font-extrabold uppercase tracking-wider text-brand-700">
+                    {tg.label}
+                  </p>,
+                  ...tg.items.map((a) => {
                   const total = a.classes?.students?.[0]?.count ?? 0;
                   const scores = (a.submissions ?? []).map((s) => s.score).filter((s): s is number => s !== null).map(Number);
                   const done = scores.length;
@@ -102,7 +116,8 @@ export default async function ResultadosPage() {
                       <ChevronRight size={18} className="shrink-0 text-muted" />
                     </Link>
                   );
-                })}
+                  }),
+                ])}
               </Card>
             </section>
           ))}

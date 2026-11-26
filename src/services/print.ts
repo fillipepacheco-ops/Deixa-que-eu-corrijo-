@@ -60,24 +60,26 @@ export type PrintDoc = "prova" | "cartao" | "kit";
  *  - prova:  uma prova por aluno (nome na capa) — ou em branco se `blank`;
  *  - cartao: um cartão por aluno (+ extras em branco quando for a turma toda);
  *  - kit:    para cada aluno, a prova seguida do cartão (um pacote por aluno).
- * `studentId` limita a um aluno.
+ * `studentId`/`studentIds` limitam aos alunos escolhidos.
  */
 export async function buildPrintPdf(
   supabase: SupabaseClient,
   assessmentId: string,
-  opts: { doc: PrintDoc; studentId?: string | null; blank?: boolean; appLogo?: Uint8Array | null },
+  opts: { doc: PrintDoc; studentId?: string | null; studentIds?: string[] | null; blank?: boolean; appLogo?: Uint8Array | null },
 ): Promise<Uint8Array> {
   const data = await loadAssessment(supabase, assessmentId);
   if (!data) throw new PrintError("Avaliação não encontrada.", 404);
   if (data.questions.length === 0) throw new PrintError("Adicione questões antes de imprimir.");
 
   const all = await loadStudents(supabase, data.row.class_id);
+  // um aluno, alguns alunos escolhidos ou a turma toda
+  const chosen = [...(opts.studentIds ?? []), ...(opts.studentId ? [opts.studentId] : [])].filter(Boolean);
   let students = all;
-  if (opts.studentId) {
-    students = all.filter((s) => s.id === opts.studentId);
+  if (chosen.length) {
+    students = all.filter((s) => chosen.includes(s.id));
     if (!students.length) throw new PrintError("Aluno não encontrado nesta turma.");
   }
-  const wholeClass = !opts.studentId;
+  const wholeClass = chosen.length === 0;
 
   const needsExam = opts.doc === "prova" || opts.doc === "kit";
   const needsCards = opts.doc === "cartao" || opts.doc === "kit";

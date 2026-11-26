@@ -12,6 +12,7 @@ export interface HeaderValues {
   applied_on?: string | null;
   max_score?: number | null;
   instructions?: string | null;
+  term?: number | null;
 }
 
 function Group({ title, hint, children }: { title: string; hint?: string; children: React.ReactNode }) {
@@ -51,6 +52,17 @@ export function HeaderFields({
         <div>
           <label className="label" htmlFor="applied_on">Data de aplicação</label>
           <input className="field" id="applied_on" name="applied_on" type="date" defaultValue={value.applied_on ?? ""} />
+        </div>
+        <div>
+          <label className="label" htmlFor="term">Bimestre</label>
+          <select className="field" id="term" name="term" defaultValue={value.term ? String(value.term) : ""}>
+            <option value="">Automático (pelo título ou pela data)</option>
+            {[1, 2, 3, 4].map((t) => (
+              <option key={t} value={t}>
+                {t}º bimestre
+              </option>
+            ))}
+          </select>
         </div>
         <div>
           <label className="label" htmlFor="teacher_name">Professor(a)</label>
