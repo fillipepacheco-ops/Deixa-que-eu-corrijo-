@@ -24,6 +24,8 @@ export interface AnswerSheetInput {
   cards: AnswerSheetCard[];
   /** Logo oficial em PNG (public/brand/logo.png). Sem ela, usa o símbolo em vetor. */
   logoPng?: Uint8Array | null;
+  /** Logo da escola (a mesma da capa da prova), JPEG ou PNG — vai no canto superior direito. */
+  schoolLogo?: Uint8Array | null;
 }
 
 const toX = (xMm: number) => mm(xMm);
@@ -40,6 +42,14 @@ export async function generateAnswerSheetsPdf(input: AnswerSheetInput): Promise<
   const regular = await doc.embedFont(StandardFonts.Helvetica);
   const bold = await doc.embedFont(StandardFonts.HelveticaBold);
   const logo = input.logoPng ? await doc.embedPng(input.logoPng) : null;
+  let schoolLogo: Awaited<ReturnType<typeof doc.embedPng>> | null = null;
+  if (input.schoolLogo?.length) {
+    try {
+      schoolLogo = input.schoolLogo[0] === 0x89 ? await doc.embedPng(input.schoolLogo) : await doc.embedJpg(input.schoolLogo);
+    } catch {
+      schoolLogo = null; // imagem inválida: o cartão sai sem ela
+    }
+  }
 
   for (const card of input.cards) {
     const page = doc.addPage([A4.w, A4.h]);
@@ -80,6 +90,18 @@ export async function generateAnswerSheetsPdf(input: AnswerSheetInput): Promise<
       titleX = mm(14) + w + mm(5);
     } else {
       drawBrandMark(page, mm(14), mm(24), mm(9));
+    }
+    // Logo da escola no canto superior direito, num espaço livre: abaixo da faixa do código
+    // e afastada do quadrado preto do canto (não atrapalha a leitura pela câmera).
+    if (schoolLogo) {
+      const boxW = mm(40);
+      const boxH = mm(19);
+      const scale = Math.min(boxW / schoolLogo.width, boxH / schoolLogo.height);
+      const w = schoolLogo.width * scale;
+      const h = schoolLogo.height * scale;
+      const right = mm(194);
+      const top = mm(22);
+      page.drawImage(schoolLogo, { x: right - w, y: A4.h - top - (boxH + h) / 2, width: w, height: h });
     }
     drawTextTop(page, "CARTÃO-RESPOSTA", { x: titleX, top: mm(23.5), size: 14, font: bold, color: BRAND.dark });
     drawTextTop(page, `Cartão nº ${String(card.sheetNumber).padStart(7, "0")}`, {

@@ -110,6 +110,7 @@ export async function buildPrintPdf(
     cardOf = r.byStudent;
     blanks = r.blanks.slice(0, blankCount);
     const h = examHeader(data.assessment);
+    const schoolLogo = await loadSchoolLogo(supabase, data.row.school_logo_path);
     cardsFor = (cards) =>
       generateAnswerSheetsPdf({
         assessmentTitle: h.title,
@@ -120,6 +121,7 @@ export async function buildPrintPdf(
         questions: specs,
         cards,
         logoPng: opts.appLogo ?? null,
+        schoolLogo,
       });
   }
 
