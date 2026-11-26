@@ -37,3 +37,12 @@ test("bimestre pelo escolhido, pelo título ou pela data", () => {
   ]);
   assert.deepEqual(g.map((x) => [x.label, x.items.length]), [["4º bimestre", 2], ["1º bimestre", 1]]);
 });
+
+import { isExactSubject } from "../src/lib/pdf/assessment-pdf";
+test("rascunho só em exatas", () => {
+  assert.equal(isExactSubject("Matemática"), true);
+  assert.equal(isExactSubject("Física"), true);
+  assert.equal(isExactSubject("Língua Portuguesa"), false);
+  assert.equal(isExactSubject(null, "TEOREMA DE PITÁGORAS | AVALIAÇÃO"), true);
+  assert.equal(isExactSubject("História", "Teorema"), false);
+});

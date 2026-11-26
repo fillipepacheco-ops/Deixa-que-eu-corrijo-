@@ -92,6 +92,15 @@ export interface AssessmentPdfInput {
   schoolLogo?: Uint8Array | null;
   /** Prova personalizada: nome e nº do aluno já preenchidos. */
   student?: ExamStudent | null;
+  /** Quadros de rascunho nos espaços vazios. Padrão: automático para disciplinas de exatas. */
+  draftBoxes?: boolean;
+}
+
+/** Matemática, Física, Química e afins (pela disciplina ou, sem ela, pelo título). */
+export function isExactSubject(subject: string | null | undefined, title?: string | null): boolean {
+  const re = /matem[aá]tic|f[ií]sica|qu[ií]mica|geometri|[aá]lgebra|estat[ií]stic|trigonometri|aritm[eé]tic|c[aá]lculo|exatas|teorema|equa[cç][aã]o|fun[cç][aã]o (?:afim|quadr[aá]tica)/i;
+  const s = (subject ?? "").normalize("NFC");
+  return s ? re.test(s) : re.test((title ?? "").normalize("NFC"));
 }
 
 export interface AssessmentPdfResult {
@@ -338,6 +347,29 @@ export async function generateAssessmentPdf(input: AssessmentPdfInput): Promise<
   };
   const colX = () => MARGIN_X + col * (colW + COLUMN_GAP);
 
+  // Provas de exatas: o espaço que sobrar no fim de uma coluna vira um quadro de RASCUNHO.
+  const draftOn = input.draftBoxes ?? isExactSubject(assessment.subject, assessment.title);
+  const DRAFT_MIN = mm(28);
+  const fillDraft = () => {
+    const top = cursor + (cursor > areaTop ? lh * 0.3 : 0);
+    const h = areaBottom - top;
+    if (!draftOn || h < DRAFT_MIN) return;
+    const x = colX();
+    page.drawRectangle({
+      x, y: A4.h - top - h, width: colW, height: h,
+      borderColor: BRAND.mid, borderWidth: 0.8, borderDashArray: [4, 3], borderOpacity: 0.55,
+    });
+    drawTextTop(page, "RASCUNHO", { x: x + 6, top: top + 5, size: 8, font: bold, color: BRAND.mid });
+    const note = "não vale para a correção";
+    drawTextTop(page, note, { x: x + colW - 6 - italic.widthOfTextAtSize(note, 7), top: top + 5.5, size: 7, font: italic, color: BRAND.gray });
+    cursor = areaBottom;
+  };
+  /** Passa para a próxima coluna entre uma questão e outra (o espaço que sobra vira rascunho). */
+  const nextColumnAfterQuestion = () => {
+    fillDraft();
+    nextColumn();
+  };
+
   function drawFirstHeader(p: PDFPage): number {
     let top = MARGIN_TOP;
     const a = assessment;
@@ -531,7 +563,7 @@ export async function generateAssessmentPdf(input: AssessmentPdfInput): Promise<
       // Nunca começa no pé da página e continua na outra página: vai inteira para a próxima
       // (só divide entre páginas se a questão for maior que uma coluna inteira).
       // Entre as colunas da mesma página pode dividir, se ficar um bom pedaço.
-      if ((lastColumn && total <= columnH()) || room < first || room < Math.min(lh * 4, columnH() * 0.12)) nextColumn();
+      if ((lastColumn && total <= columnH()) || room < first || room < Math.min(lh * 4, columnH() * 0.12)) nextColumnAfterQuestion();
     }
     questionPages[g.number] = pages.length;
 
@@ -558,6 +590,15 @@ export async function generateAssessmentPdf(input: AssessmentPdfInput): Promise<
       }
     }
     for (const piece of tail) if (cursor > areaTop) cursor = Math.min(areaBottom, cursor + piece.h);
+  }
+  // fim da prova: o resto da coluna e as colunas vazias da última página também viram rascunho
+  if (draftOn) {
+    fillDraft();
+    while (col < cfg.columns - 1) {
+      col++;
+      cursor = areaTop;
+      fillDraft();
+    }
   }
 
   // ---------- rodapé com paginação ----------
