@@ -232,7 +232,7 @@ export function GameHost({
           <div className="flex flex-1 flex-col items-center gap-6 pt-4 text-center text-white">
             <div className="rounded-3xl bg-white px-8 py-5 text-brand-900 shadow-2xl">
               <p className="text-[18px] font-bold text-violet-700">
-                Entre em <span className="underline">{joinUrl.replace(/^https?:\/\//, "")}</span> e digite o PIN
+                Abra <span className="underline">{joinUrl.replace(/^https?:\/\//, "").replace(/\/jogar$/, "")}</span>, toque em <strong>Aluno(a)</strong> e digite o PIN
               </p>
               <p className="mt-1 font-mono text-[72px] font-black leading-none tracking-[0.12em] text-violet-950 sm:text-[110px]">{initial.pin}</p>
             </div>

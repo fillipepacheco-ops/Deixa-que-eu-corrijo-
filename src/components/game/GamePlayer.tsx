@@ -294,6 +294,9 @@ function Join({ initialPin, onJoined }: { initialPin: string; onJoined: (c: Cred
           </>
         )}
         {error && <p className="rounded-xl bg-white px-4 py-3 text-center text-[15px] font-bold text-red-700">{error}</p>}
+        <a href="/login" className="text-center text-[13px] font-semibold text-white/80 underline">
+          Sou professor(a)
+        </a>
         <p className="text-center text-[12px] font-semibold text-white/70">
           Durante o jogo, não saia desta tela: trocar de aba ou de aplicativo bloqueia a sua equipe até o professor liberar.
         </p>

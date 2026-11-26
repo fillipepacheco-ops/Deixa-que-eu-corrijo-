@@ -1,11 +1,12 @@
 import type { Metadata } from "next";
 import { Logo } from "@/components/brand/Logo";
 import { AuthForm } from "./AuthForm";
+import { RoleChooser } from "./RoleChooser";
 
 export const metadata: Metadata = { title: "Entrar" };
 
-export default async function LoginPage({ searchParams }: { searchParams: Promise<{ erro?: string }> }) {
-  const { erro } = await searchParams;
+export default async function LoginPage({ searchParams }: { searchParams: Promise<{ erro?: string; perfil?: string }> }) {
+  const { erro, perfil } = await searchParams;
   return (
     <main className="grid min-h-dvh lg:grid-cols-[1.05fr_1fr]">
       <section className="relative hidden overflow-hidden bg-brand-900 p-12 text-white lg:flex lg:flex-col lg:justify-between">
@@ -41,7 +42,9 @@ export default async function LoginPage({ searchParams }: { searchParams: Promis
               O link de confirmação expirou ou já foi usado. Entre com seu e-mail e senha.
             </p>
           )}
-          <AuthForm />
+          <RoleChooser initial={perfil === "aluno" ? "aluno" : "professor"}>
+            <AuthForm />
+          </RoleChooser>
         </div>
       </section>
     </main>
