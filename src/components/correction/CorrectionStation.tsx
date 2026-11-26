@@ -29,6 +29,8 @@ interface Props {
   sheets: { sheet_number: number; student_id: string | null }[];
   students: StationStudent[];
   corrected: Record<string, number>; // aluno → nota já salva
+  /** Logo da escola (link temporário) para o comprovante. */
+  schoolLogoUrl?: string | null;
 }
 
 interface Shot {
@@ -90,6 +92,16 @@ export function CorrectionStation(props: Props) {
   const correctedRef = useRef(corrected);
   correctedRef.current = corrected;
 
+  // logo da escola para o comprovante (carregada uma vez; CORS liberado no Storage)
+  const [logo, setLogo] = useState<HTMLImageElement | null>(null);
+  useEffect(() => {
+    if (!props.schoolLogoUrl) return;
+    const img = new Image();
+    img.crossOrigin = "anonymous";
+    img.onload = () => setLogo(img);
+    img.src = props.schoolLogoUrl;
+  }, [props.schoolLogoUrl]);
+
   // ---------- regras ----------
   const identify = useCallback(
     (r: ReadResult): { id: string; source: "" | "code" | "roll" | "other-assessment" } => {
@@ -125,8 +137,9 @@ export function CorrectionStation(props: Props) {
         studentName,
         assessmentTitle: props.assessmentTitle,
         when: new Date(),
+        logo,
       }).toDataURL("image/jpeg", 0.85),
-    [specs, answerKey, props.assessmentTitle],
+    [specs, answerKey, props.assessmentTitle, logo],
   );
 
   /** Envia o comprovante e grava a nota no banco. Devolve a nota salva. */

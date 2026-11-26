@@ -339,6 +339,18 @@ export async function generateAssessmentDocx(header: ExamHeader, questions: Asse
         tabStops: [{ type: TabStopType.RIGHT, position: CONTENT_W }],
         border: { bottom: { style: BorderStyle.SINGLE, size: 4, color: "B8C2BC", space: 4 } },
         children: [
+          // logo da escola pequena em todas as páginas de questões
+          ...(opts.schoolLogo?.length
+            ? (() => {
+                const kind = opts.schoolLogo[0] === 0x89 ? "png" : "jpg";
+                const { width, height } = imageSize(opts.schoolLogo, kind);
+                const sc = Math.min(22 / height, 100 / width); // ~0,6 cm de altura
+                return [
+                  new ImageRun({ type: kind, data: opts.schoolLogo, transformation: { width: Math.round(width * sc), height: Math.round(height * sc) } }),
+                  new TextRun({ text: "  ", size: 16, font: FONT }),
+                ];
+              })()
+            : []),
           new TextRun({ text: header.title, bold: true, size: 16, color: MID, font: FONT }),
           new TextRun({
             text: `\tAluno(a): ${opts.student?.name ?? "________________________________"}`,

@@ -525,7 +525,16 @@ export async function generateAssessmentPdf(input: AssessmentPdfInput): Promise<
   function drawRunningHeader(p: PDFPage): number {
     const top = MARGIN_TOP;
     const title = sanitize(regular, assessment.title);
-    drawTextTop(p, title.length > 70 ? title.slice(0, 67) + "..." : title, { x: MARGIN_X, top, size: 8, font: bold, color: BRAND.mid });
+    // logo da escola pequena no começo do cabeçalho de todas as páginas
+    let tx = MARGIN_X;
+    if (logo) {
+      const h = 15;
+      const w = Math.min(mm(28), (logo.width / logo.height) * h);
+      const hh = (w / logo.width) * logo.height;
+      p.drawImage(logo, { x: MARGIN_X, y: A4.h - (top + 10.5) + (h - hh) / 2, width: w, height: hh }); // de top-4,5 até top+10,5
+      tx = MARGIN_X + w + 6;
+    }
+    drawTextTop(p, title.length > 70 ? title.slice(0, 67) + "..." : title, { x: tx, top, size: 8, font: bold, color: BRAND.mid });
     const name = student ? `Aluno(a): ${sanitize(regular, student.name)}` : "Aluno(a): ______________________________";
     drawTextTop(p, name, { x: MARGIN_X + contentW - regular.widthOfTextAtSize(name, 8), top, size: 8, font: regular, color: BRAND.gray });
     p.drawLine({ start: { x: MARGIN_X, y: A4.h - top - 13 }, end: { x: MARGIN_X + contentW, y: A4.h - top - 13 }, thickness: 0.6, color: BRAND.line });

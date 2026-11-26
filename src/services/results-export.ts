@@ -3,6 +3,7 @@ import { formatDateBR, fileSlug } from "@/lib/assessment/header";
 import { combineScores, diaryMax, diaryText, diaryValue, formatNumber, formatRaw, passes, sortStudents, toCsv, type Combine, type DiaryFormat } from "@/lib/results/diary";
 import { generateGradesPdf, type GradesColumn } from "@/lib/pdf/grades-pdf";
 import { loadAssessmentResults, loadClassResults } from "./results-data";
+import { loadSchoolLogo } from "./assessment-data";
 
 export interface ExportFile {
   bytes: Uint8Array;
@@ -37,6 +38,7 @@ export async function exportAssessment(supabase: SupabaseClient, id: string, kin
     { label: head[head.length - 1], width: 2.6, align: "center" },
   ];
   const bytes = await generateGradesPdf({
+    schoolLogo: await loadSchoolLogo(supabase, res.row.school_logo_path),
     title: a.title,
     info: [a.school_name ?? "", [a.class_name, a.subject].filter(Boolean).join(" · "), a.applied_on ? `Aplicada em ${formatDateBR(a.applied_on)}` : ""],
     columns,
@@ -86,6 +88,7 @@ export async function exportClass(
   if (kind === "planilha") return { bytes: enc(toCsv([head, ...body])), filename: `${base}.csv`, mime: "text/csv" };
 
   const bytes = await generateGradesPdf({
+    schoolLogo: await loadSchoolLogo(supabase, res.logoPath),
     title: `Notas da turma ${res.className}`,
     info: [res.school, `${res.assessments.length} avaliação(ões) · resultado: ${combine === "soma" ? "soma dos pontos" : "média"}`],
     columns: [

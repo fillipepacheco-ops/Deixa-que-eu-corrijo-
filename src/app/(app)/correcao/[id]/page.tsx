@@ -3,7 +3,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ArrowLeft, BarChart3 } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
-import { loadAssessment, loadStudents } from "@/services/assessment-data";
+import { loadAssessment, loadStudents, schoolLogoUrl } from "@/services/assessment-data";
 import { sheetQuestionsFrom } from "@/lib/answer-sheet/layout";
 import { keyFromQuestions } from "@/lib/correction/key";
 import { CorrectionStation } from "@/components/correction/CorrectionStation";
@@ -74,6 +74,7 @@ export default async function CorrigirPage({ params }: { params: Promise<{ id: s
             sheets={(sheets ?? []) as { sheet_number: number; student_id: string | null }[]}
             students={students}
             corrected={corrected}
+            schoolLogoUrl={await schoolLogoUrl(supabase, row.school_logo_path)}
           />
           <ProofList rows={rows} total={students.length} />
         </div>

@@ -27,6 +27,8 @@ export interface ProofInput {
   studentName: string;
   assessmentTitle: string;
   when: Date;
+  /** Logo da escola (já carregada), à esquerda na faixa do comprovante. */
+  logo?: (CanvasImageSource & { width: number; height: number }) | null;
 }
 
 export function buildProof(input: ProofInput): HTMLCanvasElement {
@@ -45,19 +47,33 @@ export function buildProof(input: ProofInput): HTMLCanvasElement {
   ctx.fillRect(0, band - Math.max(3, W * 0.004), W, Math.max(3, W * 0.004));
   const u = W / 100; // unidade relativa à largura
   ctx.textBaseline = "alphabetic";
+  // logo da escola à esquerda; o texto começa depois dela
+  let tx = 3 * u;
+  if (input.logo && input.logo.width && input.logo.height) {
+    const sc = Math.min((15 * u) / input.logo.height, (16 * u) / input.logo.width);
+    const lw = input.logo.width * sc;
+    const lh = input.logo.height * sc;
+    try {
+      ctx.drawImage(input.logo, 3 * u, (band - lh) / 2 - u * 0.5, lw, lh);
+      tx = 3 * u + lw + 2.5 * u;
+    } catch {
+      /* logo não carregou: segue sem */
+    }
+  }
+  const textW = 66 * u - tx;
   ctx.fillStyle = "#137a1a";
   ctx.font = `700 ${2.2 * u}px Helvetica, Arial, sans-serif`;
-  ctx.fillText("DEIXA QUE EU CORRIJO · COMPROVANTE DE CORREÇÃO", 3 * u, 4.2 * u);
+  ctx.fillText(clip(ctx, "DEIXA QUE EU CORRIJO · COMPROVANTE DE CORREÇÃO", textW), tx, 4.2 * u);
   ctx.fillStyle = "#0b3a1e";
   ctx.font = `800 ${4.2 * u}px Helvetica, Arial, sans-serif`;
-  ctx.fillText(clip(ctx, input.studentName || "Aluno não identificado", 62 * u), 3 * u, 9.6 * u);
+  ctx.fillText(clip(ctx, input.studentName || "Aluno não identificado", textW - 1 * u), tx, 9.6 * u);
   ctx.fillStyle = "#333";
   ctx.font = `500 ${2.6 * u}px Helvetica, Arial, sans-serif`;
-  ctx.fillText(clip(ctx, input.assessmentTitle, 62 * u), 3 * u, 13.4 * u);
+  ctx.fillText(clip(ctx, input.assessmentTitle, textW - 1 * u), tx, 13.4 * u);
   ctx.fillStyle = "#5f6b65";
   ctx.font = `500 ${2.2 * u}px Helvetica, Arial, sans-serif`;
   const stats = `${grade.correctCount} certas · ${grade.wrongCount} erradas · ${grade.blankCount} em branco · ${input.when.toLocaleString("pt-BR", { dateStyle: "short", timeStyle: "short" })}`;
-  ctx.fillText(clip(ctx, stats, 66 * u), 3 * u, 17.2 * u);
+  ctx.fillText(clip(ctx, stats, textW + 3 * u), tx, 17.2 * u);
   // nota
   ctx.fillStyle = "#0b3a1e";
   roundRect(ctx, 70 * u, 2.5 * u, 27 * u, 15 * u, 2 * u);

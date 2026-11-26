@@ -21,6 +21,8 @@ export interface GradesPdfInput {
   highlight?: boolean[];
   notes?: string[];
   landscape?: boolean;
+  /** Logo da escola (JPEG ou PNG), no alto da primeira página. */
+  schoolLogo?: Uint8Array | null;
 }
 
 const RED_SOFT = rgb(1, 0.93, 0.93);
@@ -44,6 +46,14 @@ export async function generateGradesPdf(input: GradesPdfInput): Promise<Uint8Arr
   const tableW = W - 2 * M;
   const totalWeight = input.columns.reduce((a, c) => a + c.width, 0);
   const widths = input.columns.map((c) => (c.width / totalWeight) * tableW);
+  let logo: Awaited<ReturnType<typeof doc.embedPng>> | null = null;
+  if (input.schoolLogo?.length) {
+    try {
+      logo = input.schoolLogo[0] === 0x89 ? await doc.embedPng(input.schoolLogo) : await doc.embedJpg(input.schoolLogo);
+    } catch {
+      logo = null;
+    }
+  }
   const ROW = 17;
   const SIZE = input.columns.length > 8 ? 8.5 : 10;
 
@@ -74,11 +84,25 @@ export async function generateGradesPdf(input: GradesPdfInput): Promise<Uint8Arr
     text(page, tag, M + tableW - 10 - regular.widthOfTextAtSize(tag, 8), y - 19, regular, 8, rgb(0.8, 0.92, 0.8));
     y -= 30 + 14;
     if (pageNo === 1) {
-      for (const line of input.info.filter(Boolean)) {
-        text(page, fit(regular, 10, line, tableW), M, y, regular, 10, BRAND.gray);
-        y -= 14;
+      const startY = y;
+      let infoW = tableW;
+      let logoBottom = Infinity;
+      if (logo) {
+        // logo da escola à direita das informações
+        const boxH = mm(16);
+        const sc = Math.min(boxH / logo.height, mm(40) / logo.width);
+        const w = logo.width * sc;
+        const h = logo.height * sc;
+        page.drawImage(logo, { x: M + tableW - w, y: startY + 8 - h, width: w, height: h });
+        infoW = tableW - w - mm(6);
+        logoBottom = startY + 8 - h;
       }
-      y -= 4;
+      let iy = startY;
+      for (const line of input.info.filter(Boolean)) {
+        text(page, fit(regular, 10, line, infoW), M, iy, regular, 10, BRAND.gray);
+        iy -= 14;
+      }
+      y = Math.min(iy - 4, logoBottom - 10); // a tabela começa abaixo da logo
     }
     // cabeçalho da tabela
     page.drawRectangle({ x: M, y: y - ROW + 4, width: tableW, height: ROW, color: BRAND.light });

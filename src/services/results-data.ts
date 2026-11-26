@@ -115,6 +115,7 @@ export interface ClassAssessmentScores {
   applied_on: string | null;
   max_score: number;
   school: string;
+  logoPath: string | null;
   term: number | null;
   scores: Map<string, number>; // aluno → nota
 }
@@ -147,6 +148,7 @@ export async function loadClassResults(supabase: SupabaseClient, classId: string
       applied_on: r.assessment.applied_on,
       max_score: r.assessment.max_score,
       school: r.school,
+      logoPath: (r.row.school_logo_path as string | null) ?? null,
       term: termOf(r.assessment),
       scores: new Map(r.rows.filter((x) => x.score !== null).map((x) => [x.id, x.score as number])),
     }));
@@ -163,6 +165,8 @@ export async function loadClassResults(supabase: SupabaseClient, classId: string
     format,
     formatsReady: formats.ready,
     students: sortStudents<ResultStudent>(students, format.order),
+    // logo da escola: a da avaliação mais recente que tiver
+    logoPath: [...assessments].reverse().find((a) => a.logoPath)?.logoPath ?? null,
     allIds: all,
     assessments,
   };
