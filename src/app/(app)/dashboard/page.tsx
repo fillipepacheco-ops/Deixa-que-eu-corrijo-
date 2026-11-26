@@ -29,7 +29,7 @@ const SHORTCUTS: Shortcut[] = [
   { label: "Resultados", icon: BarChart3, href: "/resultados" },
   { label: "Banco de questões", icon: Library },
   { label: "Conselho de Classe", icon: ClipboardList },
-  { label: "Modo gamificado", icon: Gamepad2 },
+  { label: "Modo game", icon: Gamepad2, href: "/jogos" },
 ];
 
 function AppButton({ s }: { s: Shortcut }) {

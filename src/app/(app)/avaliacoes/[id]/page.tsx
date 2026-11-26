@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { ArrowLeft, BarChart3, Eye, FileUp, Plus, Trash2 } from "lucide-react";
+import { ArrowLeft, BarChart3, Eye, FileUp, Gamepad2, Plus, Trash2 } from "lucide-react";
 import { buttonClass } from "@/components/ui/button";
 import { createClient } from "@/lib/supabase/server";
 import { loadAssessment, loadStudents, questionImageUrls, schoolLogoUrl } from "@/services/assessment-data";
@@ -60,6 +60,9 @@ export default async function AvaliacaoPage({ params }: { params: Promise<{ id: 
             </Link>
             <Link href={`/resultados/${id}`} className={buttonClass("secondary")}>
               <BarChart3 size={18} /> Notas
+            </Link>
+            <Link href={`/jogos?avaliacao=${id}`} className={buttonClass("secondary")}>
+              <Gamepad2 size={18} /> Jogar ao vivo
             </Link>
           </>
         }
