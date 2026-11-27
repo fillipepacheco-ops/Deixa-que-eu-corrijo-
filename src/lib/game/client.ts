@@ -25,7 +25,9 @@ export interface PlayerState {
   server_now: string;
   question: GameQuestion | null;
   correct: string[] | null;
-  player: { name: string; members: string[]; score: number; locked: boolean; violations: number; rank: number; players: number };
+  ceremony_step: number;
+  /** Pontos e posição só chegam depois da cerimônia (null durante a partida). */
+  player: { name: string; members: string[]; score: number | null; locked: boolean; violations: number; rank: number | null; players: number | null; hits: number | null };
   answer: { answer: string; correct?: boolean; points?: number } | null;
   top: { name: string; score: number }[] | null;
 }

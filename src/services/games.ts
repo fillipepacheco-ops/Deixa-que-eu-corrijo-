@@ -6,6 +6,8 @@ import { createClient } from "@/lib/supabase/server";
 import { newPin } from "@/lib/game/scoring";
 import { tidyText } from "@/lib/assessment/tidy-text";
 import { loadAssessment } from "./assessment-data";
+import { keyFromQuestions } from "@/lib/correction/key";
+import { gradeSubmission, type GivenAnswer } from "@/lib/grading/grading";
 
 type State = { error?: string };
 
@@ -55,6 +57,7 @@ export async function createGame(assessmentId: string, _: State, formData: FormD
       options: q.type === "multiple_choice" ? q.options.map((o) => ({ label: o.label, text: tidyText(o.text) })) : [],
       image_url: q.image_path ? (urlOf.get(q.image_path) ?? null) : null,
       time_limit: timeLimit,
+      position: q.position,
     })),
   );
   const { error: kErr } = await supabase.from("game_keys").insert(playable.map((q, idx) => ({ game_id: gameId, idx, correct: q.correct_answers })));
@@ -74,6 +77,12 @@ export async function createGameFromForm(state: State, formData: FormData): Prom
 }
 
 /** Libera o aluno/equipe que saiu da tela do jogo. */
+export async function unlockAll(gameId: string) {
+  const supabase = await createClient();
+  await supabase.from("game_players").update({ locked: false }).eq("game_id", gameId);
+  return { ok: true };
+}
+
 export async function unlockPlayer(playerId: string) {
   const supabase = await createClient();
   const { error } = await supabase.from("game_players").update({ locked: false }).eq("id", playerId);
@@ -90,4 +99,62 @@ export async function deleteGame(gameId: string) {
   const supabase = await createClient();
   await supabase.from("games").delete().eq("id", gameId);
   revalidatePath("/jogos");
+}
+
+/**
+ * Fim da partida: a nota de cada aluno (pelo peso das questões da prova) vai para
+ * Resultados como correção on-line. Não substitui correção feita pela câmera ou à mão.
+ */
+export async function saveGameResults(gameId: string): Promise<{ ok: boolean; saved?: number; skipped?: number; error?: string }> {
+  const supabase = await createClient();
+  const { data: game } = await supabase.from("games").select("id, assessment_id").eq("id", gameId).maybeSingle();
+  if (!game?.assessment_id) return { ok: false, error: "Este jogo não está ligado a uma avaliação." };
+  const data = await loadAssessment(supabase, game.assessment_id);
+  if (!data?.row.class_id) return { ok: false, error: "A avaliação não tem turma." };
+  const [{ data: players }, { data: answers }, { data: gq }, { data: existing }] = await Promise.all([
+    supabase.from("game_players").select("id, student_ids").eq("game_id", gameId),
+    supabase.from("game_answers").select("player_id, idx, answer").eq("game_id", gameId),
+    supabase.from("game_questions").select("idx, position").eq("game_id", gameId),
+    supabase.from("submissions").select("student_id, source").eq("assessment_id", game.assessment_id),
+  ]);
+  const positionOf = new Map((gq ?? []).map((q) => [q.idx as number, (q.position as number | null) ?? (q.idx as number) + 1]));
+  const key = keyFromQuestions(data.questions);
+  const keep = new Set((existing ?? []).filter((s) => s.source === "camera" || s.source === "manual").map((s) => s.student_id as string));
+
+  const rows: Record<string, unknown>[] = [];
+  let skipped = 0;
+  for (const p of players ?? []) {
+    const given: Record<number, GivenAnswer> = {};
+    for (const a of (answers ?? []).filter((x) => x.player_id === p.id)) given[positionOf.get(a.idx as number) ?? 0] = (a.answer as string) || null;
+    const g = gradeSubmission(key, given, { maxScore: data.assessment.max_score, annulPolicy: data.assessment.annul_policy });
+    for (const sid of (p.student_ids as string[]) ?? []) {
+      if (keep.has(sid)) {
+        skipped++;
+        continue;
+      }
+      rows.push({
+        assessment_id: game.assessment_id,
+        student_id: sid,
+        source: "game",
+        answers: Object.fromEntries(Object.entries(given).map(([k, v]) => [k, v ?? null])),
+        status: "confirmed",
+        score: g.score,
+        correct_count: g.correctCount,
+        confirmed_at: new Date().toISOString(),
+      });
+    }
+  }
+  if (rows.length) {
+    const { error } = await supabase.from("submissions").upsert(rows, { onConflict: "assessment_id,student_id" });
+    if (error) return { ok: false, error: `Não foi possível salvar as notas. (${error.message})` };
+  }
+  await supabase.from("games").update({ results_saved_at: new Date().toISOString() }).eq("id", gameId);
+  revalidatePath("/resultados", "layout");
+  return { ok: true, saved: rows.length, skipped };
+}
+
+/** Passo da cerimônia (0 = nada revelado, 1 = 3º, 2 = 2º, 3 = campeão). */
+export async function setCeremonyStep(gameId: string, step: number) {
+  const supabase = await createClient();
+  await supabase.from("games").update({ ceremony_step: Math.max(0, Math.min(3, step)) }).eq("id", gameId);
 }

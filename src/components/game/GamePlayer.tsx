@@ -2,17 +2,22 @@
 /* eslint-disable @next/next/no-img-element */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Delete, Loader2, Lock } from "lucide-react";
+import { Check, Delete, Loader2, Lock } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { MathPreview } from "@/components/math/MathPreview";
-import { OPTION_STYLES } from "@/lib/game/scoring";
 import { channelName, clockOffset, remainingSeconds, rpc, type PlayerState } from "@/lib/game/client";
-import { GameBackdrop, TimerRing } from "./ui";
+import { GameBackdrop, GameLogo, OptionBadge, TimerRing } from "./ui";
 
 interface Creds {
   playerId: string;
   secret: string;
   gameId: string;
+}
+
+interface Info {
+  title: string;
+  team_size: number;
+  students: { id: string; name: string; roll: number | null; taken: boolean }[];
 }
 
 const STORE = "dqec:jogo";
@@ -38,9 +43,10 @@ const uuid = () =>
     : "10000000-1000-4000-8000-100000000000".replace(/[018]/g, (c) => (Number(c) ^ (Math.random() * 16) >> (Number(c) / 4)).toString(16));
 
 /**
- * CELULAR DO ALUNO: entra com o PIN, vê a questão com as alternativas coloridas,
- * responde (quanto mais rápido, mais pontos), vê se acertou e a posição no ranking.
- * Se sair da tela do jogo (outra aba, outro app), fica bloqueado até o professor liberar.
+ * CELULAR DO ALUNO: escolhe o próprio nome na lista da turma, responde as questões
+ * e vê se acertou. Pontos e posição só aparecem no fim, depois da cerimônia no telão.
+ * Sair da tela do jogo (outra aba, outro app, tela dividida, tela apagada) bloqueia
+ * o aluno até o professor liberar.
  */
 export function GamePlayer({ initialPin }: { initialPin: string }) {
   const supabase = useMemo(() => createClient(), []);
@@ -76,7 +82,6 @@ export function GamePlayer({ initialPin }: { initialPin: string }) {
     }
   }, [supabase, creds]);
 
-  // atualização: aviso do telão (na hora) + conferência a cada 1,5 s
   useEffect(() => {
     if (!creds) return;
     fetchState();
@@ -93,31 +98,44 @@ export function GamePlayer({ initialPin }: { initialPin: string }) {
   const status = state?.status;
   const watching = !!creds && !!status && status !== "lobby" && status !== "finished";
   const reported = useRef(false);
+  const report = useCallback(() => {
+    if (reported.current || !creds) return;
+    reported.current = true;
+    rpc(supabase, "report_violation", { p_player: creds.playerId, p_secret: creds.secret })
+      .then(() => fetchState())
+      .catch(() => {})
+      .finally(() => {
+        setTimeout(() => (reported.current = false), 3000);
+      });
+  }, [supabase, creds, fetchState]);
+
   useEffect(() => {
     if (!watching) return;
-    const onHide = () => {
-      if (document.visibilityState === "hidden" && !reported.current && creds) {
-        reported.current = true;
-        rpc(supabase, "report_violation", { p_player: creds.playerId, p_secret: creds.secret })
-          .then(() => fetchState())
-          .catch(() => {})
-          .finally(() => {
-            reported.current = false;
-          });
-      }
-    };
-    const onLeave = (e: BeforeUnloadEvent) => {
-      e.preventDefault();
-    };
+    const onHide = () => document.visibilityState === "hidden" && report();
+    // Tela dividida / janela flutuante (Android): a página perde o foco ou fica bem menor que a tela.
+    let unfocused = 0;
+    const full = { w: window.innerWidth, h: window.innerHeight };
+    const check = setInterval(() => {
+      const typing = document.activeElement instanceof HTMLInputElement;
+      if (!document.hasFocus()) {
+        unfocused++;
+        if (unfocused >= 2) report();
+      } else unfocused = 0;
+      const area = window.innerWidth * window.innerHeight;
+      const fullArea = Math.max(full.w * full.h, 1);
+      if (!typing && area < fullArea * 0.6) report();
+    }, 1000);
+    const onLeave = (e: BeforeUnloadEvent) => e.preventDefault();
     document.addEventListener("visibilitychange", onHide);
     window.addEventListener("pagehide", onHide);
     window.addEventListener("beforeunload", onLeave);
     return () => {
+      clearInterval(check);
       document.removeEventListener("visibilitychange", onHide);
       window.removeEventListener("pagehide", onHide);
       window.removeEventListener("beforeunload", onLeave);
     };
-  }, [watching, supabase, creds, fetchState]);
+  }, [watching, report]);
 
   // tela sempre acesa durante o jogo (apagar a tela conta como sair)
   useEffect(() => {
@@ -162,10 +180,8 @@ export function GamePlayer({ initialPin }: { initialPin: string }) {
   return (
     <GameBackdrop>
       <header className="flex items-center gap-2 px-4 pt-3 text-white">
-        <span className="min-w-0 flex-1 truncate text-[15px] font-extrabold">{state?.player.name ?? "…"}</span>
-        {state && state.status !== "lobby" && (
-          <span className="rounded-full bg-white/15 px-3 py-1 text-[14px] font-black tabular-nums">{state.player.score} pts</span>
-        )}
+        <GameLogo height={30} />
+        <span className="min-w-0 flex-1 truncate text-right text-[15px] font-extrabold">{state?.player.name ?? "…"}</span>
       </header>
       {error && <p className="mx-4 mt-2 rounded-xl bg-black/30 px-3 py-1.5 text-center text-[13px] font-semibold text-white">{error}</p>}
 
@@ -178,16 +194,16 @@ export function GamePlayer({ initialPin }: { initialPin: string }) {
           <Waiting state={state} onLeave={leave} />
         ) : state.status === "question" && state.question ? (
           <Question key={state.index} state={state} creds={creds} remaining={remainingSeconds(state.started_at, state.question.time_limit, offset, now)} onSent={fetchState} />
-        ) : state.status === "reveal" || state.status === "ranking" ? (
+        ) : state.status === "reveal" ? (
           <Result state={state} />
         ) : state.status === "finished" ? (
           <Final state={state} onLeave={leave} />
         ) : (
-          <Waiting state={state} onLeave={leave} />
+          <Between />
         )}
       </main>
 
-      {state?.player.locked && <Locked />}
+      {state?.player.locked && state.status !== "finished" && <Locked />}
     </GameBackdrop>
   );
 }
@@ -196,7 +212,8 @@ export function GamePlayer({ initialPin }: { initialPin: string }) {
 function Join({ initialPin, onJoined }: { initialPin: string; onJoined: (c: Creds) => void }) {
   const supabase = useMemo(() => createClient(), []);
   const [pin, setPin] = useState(initialPin);
-  const [info, setInfo] = useState<{ title: string; team_size: number } | null>(null);
+  const [info, setInfo] = useState<Info | null>(null);
+  const [picked, setPicked] = useState<string[]>([]);
   const [team, setTeam] = useState("");
   const [members, setMembers] = useState<string[]>(["", "", ""]);
   const [error, setError] = useState("");
@@ -206,7 +223,8 @@ function Join({ initialPin, onJoined }: { initialPin: string; onJoined: (c: Cred
     setBusy(true);
     setError("");
     try {
-      setInfo(await rpc(supabase, "game_info", { p_pin: pin.trim() }));
+      const r = await rpc<Info>(supabase, "game_info", { p_pin: pin.trim() });
+      setInfo({ ...r, students: r.students ?? [] });
     } catch (e) {
       setError(e instanceof Error ? e.message : "PIN não encontrado.");
     } finally {
@@ -216,14 +234,14 @@ function Join({ initialPin, onJoined }: { initialPin: string; onJoined: (c: Cred
 
   async function join() {
     if (!info) return;
+    const fromList = info.students.length > 0;
     const solo = info.team_size === 1;
-    const names = solo ? [team.trim()] : members.slice(0, info.team_size).map((m) => m.trim()).filter(Boolean);
-    if (!team.trim()) return setError(solo ? "Digite o seu nome." : "Dê um nome para a equipe.");
-    if (!solo && names.length === 0) return setError("Escreva o nome de quem está na equipe.");
+    if (fromList && picked.length === 0) return setError(solo ? "Toque no seu nome." : "Toquem nos nomes de quem está na equipe.");
+    const names = fromList ? [] : solo ? [team.trim()] : members.slice(0, info.team_size).map((m) => m.trim()).filter(Boolean);
+    if (!fromList && !team.trim()) return setError(solo ? "Digite o seu nome." : "Dê um nome para a equipe.");
     setBusy(true);
     setError("");
     try {
-      // tela cheia ajuda o aluno a não sair do jogo (onde o aparelho permite)
       document.documentElement.requestFullscreen?.().catch(() => {});
       const secret = uuid();
       const r = await rpc<{ player_id: string; game_id: string }>(supabase, "join_game", {
@@ -231,23 +249,28 @@ function Join({ initialPin, onJoined }: { initialPin: string; onJoined: (c: Cred
         p_name: team.trim(),
         p_members: names,
         p_secret: secret,
+        p_students: picked,
       });
       onJoined({ playerId: r.player_id, secret, gameId: r.game_id });
     } catch (e) {
       setError(e instanceof Error ? e.message : "Não foi possível entrar.");
+      if (info.students.length) findGame();
     } finally {
       setBusy(false);
     }
   }
 
-  const input = "w-full rounded-2xl border-0 bg-white px-4 py-4 text-center text-[20px] font-extrabold text-violet-950 shadow-lg outline-none placeholder:text-violet-300 focus:ring-4 focus:ring-lime";
+  const input =
+    "w-full rounded-2xl border-0 bg-white px-4 py-4 text-center text-[20px] font-extrabold text-[#0b3b29] shadow-lg outline-none placeholder:text-[#9cc5a8] focus:ring-4 focus:ring-[#7cc520]";
+  const toggle = (id: string) =>
+    setPicked((p) => (p.includes(id) ? p.filter((x) => x !== id) : info?.team_size === 1 ? [id] : p.length < (info?.team_size ?? 1) ? [...p, id] : p));
 
   return (
     <GameBackdrop>
       <main className="mx-auto flex w-full max-w-md flex-1 flex-col justify-center gap-4 px-5 py-8">
-        <div className="text-center text-white">
-          <p className="text-[14px] font-extrabold uppercase tracking-[0.25em] text-lime">Deixa que eu Corrijo</p>
-          <h1 className="text-[40px] font-black leading-tight drop-shadow">Modo Game</h1>
+        <div className="flex flex-col items-center gap-2 text-center text-white">
+          <GameLogo height={48} />
+          <h1 className="text-[34px] font-black leading-tight drop-shadow">Modo Game</h1>
         </div>
         {!info ? (
           <>
@@ -263,7 +286,7 @@ function Join({ initialPin, onJoined }: { initialPin: string; onJoined: (c: Cred
             <button
               onClick={findGame}
               disabled={busy || pin.length !== 6}
-              className="rounded-2xl bg-lime py-4 text-[22px] font-black text-brand-900 shadow-xl active:scale-95 disabled:opacity-50"
+              className="rounded-2xl bg-[#7cc520] py-4 text-[22px] font-black text-[#0b3b29] shadow-xl active:scale-95 disabled:opacity-50"
             >
               {busy ? <Loader2 className="mx-auto animate-spin" /> : "Entrar"}
             </button>
@@ -276,19 +299,52 @@ function Join({ initialPin, onJoined }: { initialPin: string; onJoined: (c: Cred
                 {info.team_size === 1 ? "Jogo individual" : info.team_size === 2 ? "Jogo em duplas" : "Jogo em trios"}
               </span>
             </p>
-            <input className={input} maxLength={40} placeholder={info.team_size === 1 ? "Seu nome" : "Nome da equipe"} value={team} onChange={(e) => setTeam(e.target.value)} />
-            {info.team_size > 1 &&
-              Array.from({ length: info.team_size }, (_, i) => (
-                <input
-                  key={i}
-                  className={`${input} py-3 text-[17px]`}
-                  maxLength={40}
-                  placeholder={`Integrante ${i + 1}`}
-                  value={members[i]}
-                  onChange={(e) => setMembers((m) => m.map((x, k) => (k === i ? e.target.value : x)))}
-                />
-              ))}
-            <button onClick={join} disabled={busy} className="rounded-2xl bg-lime py-4 text-[22px] font-black text-brand-900 shadow-xl active:scale-95 disabled:opacity-50">
+            {info.students.length > 0 ? (
+              <>
+                <p className="text-center text-[15px] font-bold text-white">
+                  {info.team_size === 1 ? "Toque no seu nome" : `Toquem nos nomes da equipe (até ${info.team_size})`}
+                </p>
+                <div className="max-h-[42dvh] space-y-1.5 overflow-y-auto rounded-2xl bg-white/10 p-2">
+                  {info.students.map((s) => {
+                    const on = picked.includes(s.id);
+                    return (
+                      <button
+                        key={s.id}
+                        disabled={s.taken}
+                        onClick={() => toggle(s.id)}
+                        className={`flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-[16px] font-bold transition ${
+                          on ? "bg-[#7cc520] text-[#0b3b29]" : s.taken ? "bg-white/10 text-white/40" : "bg-white text-[#0b3b29] active:scale-[0.98]"
+                        }`}
+                      >
+                        <span className="w-7 text-right text-[13px] opacity-70">{s.roll ?? "–"}</span>
+                        <span className="min-w-0 flex-1 truncate">{s.name}</span>
+                        {on && <Check size={20} strokeWidth={3} />}
+                        {s.taken && <span className="text-[11px] font-semibold">já entrou</span>}
+                      </button>
+                    );
+                  })}
+                </div>
+                {info.team_size > 1 && (
+                  <input className={`${input} py-3 text-[17px]`} maxLength={40} placeholder="Nome da equipe (opcional)" value={team} onChange={(e) => setTeam(e.target.value)} />
+                )}
+              </>
+            ) : (
+              <>
+                <input className={input} maxLength={40} placeholder={info.team_size === 1 ? "Seu nome" : "Nome da equipe"} value={team} onChange={(e) => setTeam(e.target.value)} />
+                {info.team_size > 1 &&
+                  Array.from({ length: info.team_size }, (_, i) => (
+                    <input
+                      key={i}
+                      className={`${input} py-3 text-[17px]`}
+                      maxLength={40}
+                      placeholder={`Integrante ${i + 1}`}
+                      value={members[i]}
+                      onChange={(e) => setMembers((m) => m.map((x, k) => (k === i ? e.target.value : x)))}
+                    />
+                  ))}
+              </>
+            )}
+            <button onClick={join} disabled={busy} className="rounded-2xl bg-[#7cc520] py-4 text-[22px] font-black text-[#0b3b29] shadow-xl active:scale-95 disabled:opacity-50">
               {busy ? <Loader2 className="mx-auto animate-spin" /> : "Vamos jogar!"}
             </button>
           </>
@@ -298,7 +354,7 @@ function Join({ initialPin, onJoined }: { initialPin: string; onJoined: (c: Cred
           Sou professor(a)
         </a>
         <p className="text-center text-[12px] font-semibold text-white/70">
-          Durante o jogo, não saia desta tela: trocar de aba ou de aplicativo bloqueia a sua equipe até o professor liberar.
+          Durante o jogo, não saia desta tela: trocar de aba, abrir outro app ou dividir a tela bloqueia você até o professor liberar.
         </p>
       </main>
     </GameBackdrop>
@@ -308,13 +364,22 @@ function Join({ initialPin, onJoined }: { initialPin: string; onJoined: (c: Cred
 function Waiting({ state, onLeave }: { state: PlayerState; onLeave: () => void }) {
   return (
     <div className="flex flex-1 flex-col items-center justify-center gap-4 text-center text-white">
-      <p className="text-[52px]">🎮</p>
+      <p className="text-[52px]">✏️</p>
       <h2 className="text-[30px] font-black">Você está no jogo!</h2>
       <p className="text-[17px] font-semibold text-white/85">Veja o seu nome no telão e aguarde o professor começar.</p>
       {state.player.members.length > 0 && <p className="rounded-full bg-white/15 px-4 py-2 text-[15px] font-bold">{state.player.members.join(" · ")}</p>}
       <button onClick={onLeave} className="mt-6 text-[13px] font-semibold text-white/70 underline">
         Sair e entrar com outro nome
       </button>
+    </div>
+  );
+}
+
+function Between() {
+  return (
+    <div className="flex flex-1 flex-col items-center justify-center gap-3 text-center text-white">
+      <Loader2 className="animate-spin" size={42} />
+      <p className="text-[22px] font-black">Preparando a próxima questão…</p>
     </div>
   );
 }
@@ -378,25 +443,20 @@ function Question({ state, creds, remaining, onSent }: { state: PlayerState; cre
       ) : q.type === "numeric" ? (
         <NumericPad digits={digits} setDigits={setDigits} onSend={() => send(digits)} sending={sending} />
       ) : (
-        <div className={`grid flex-1 gap-3 ${options.length > 2 ? "grid-cols-2" : "grid-cols-1"}`}>
-          {options.map((o, i) => {
-            const st = OPTION_STYLES[i % OPTION_STYLES.length];
-            return (
-              <button
-                key={o.label}
-                onClick={() => send(o.label)}
-                disabled={sending}
-                className="flex min-h-24 flex-col items-center justify-center gap-1 rounded-2xl p-3 text-white shadow-lg transition active:scale-95"
-                style={{ background: st.bg }}
-              >
-                <span className="text-[30px] leading-none">{st.shape}</span>
-                <span className="flex items-baseline justify-center gap-1 text-[16px] font-extrabold leading-tight">
-                  {q.type === "multiple_choice" && <span className="opacity-80">{o.label})</span>}
-                  <MathPreview text={o.text} />
-                </span>
-              </button>
-            );
-          })}
+        <div className="flex flex-1 flex-col gap-2.5">
+          {options.map((o) => (
+            <button
+              key={o.label}
+              onClick={() => send(o.label)}
+              disabled={sending}
+              className="flex min-h-16 items-center gap-3 rounded-2xl bg-white p-3 text-left text-[17px] font-extrabold text-[#0b3b29] shadow-lg ring-[#7cc520] transition active:scale-[0.98] active:ring-4"
+            >
+              <OptionBadge label={o.label} size={42} />
+              <span className="min-w-0 flex-1">
+                <MathPreview text={o.text} />
+              </span>
+            </button>
+          ))}
         </div>
       )}
       {error && <p className="rounded-xl bg-white px-3 py-2 text-center text-[14px] font-bold text-red-700">{error}</p>}
@@ -411,24 +471,24 @@ function NumericPad({ digits, setDigits, onSend, sending }: { digits: string; se
       <div className="flex justify-center gap-2">
         {["Centena", "Dezena", "Unidade"].map((l, i) => (
           <div key={l} className="flex w-20 flex-col items-center rounded-2xl bg-white py-2 shadow-lg">
-            <span className={`text-[40px] font-black tabular-nums ${digits.length >= 3 - i ? "text-violet-900" : "text-violet-200"}`}>{shown[i]}</span>
-            <span className="text-[11px] font-bold uppercase text-violet-500">{l}</span>
+            <span className={`text-[40px] font-black tabular-nums ${digits.length >= 3 - i ? "text-[#0b3b29]" : "text-[#c7dccd]"}`}>{shown[i]}</span>
+            <span className="text-[11px] font-bold uppercase text-[#1f9d55]">{l}</span>
           </div>
         ))}
       </div>
       <div className="grid grid-cols-3 gap-2">
         {["1", "2", "3", "4", "5", "6", "7", "8", "9"].map((d) => (
-          <button key={d} onClick={() => digits.length < 3 && setDigits(digits + d)} className="rounded-2xl bg-white/90 py-3 text-[26px] font-black text-violet-900 active:scale-95">
+          <button key={d} onClick={() => digits.length < 3 && setDigits(digits + d)} className="rounded-2xl bg-white/90 py-3 text-[26px] font-black text-[#0b3b29] active:scale-95">
             {d}
           </button>
         ))}
         <button onClick={() => setDigits(digits.slice(0, -1))} className="grid place-items-center rounded-2xl bg-white/30 py-3 text-white active:scale-95" aria-label="Apagar">
           <Delete size={26} />
         </button>
-        <button onClick={() => digits.length < 3 && setDigits(digits + "0")} className="rounded-2xl bg-white/90 py-3 text-[26px] font-black text-violet-900 active:scale-95">
+        <button onClick={() => digits.length < 3 && setDigits(digits + "0")} className="rounded-2xl bg-white/90 py-3 text-[26px] font-black text-[#0b3b29] active:scale-95">
           0
         </button>
-        <button onClick={onSend} disabled={!digits || sending} className="rounded-2xl bg-lime py-3 text-[18px] font-black text-brand-900 active:scale-95 disabled:opacity-40">
+        <button onClick={onSend} disabled={!digits || sending} className="rounded-2xl bg-[#7cc520] py-3 text-[18px] font-black text-[#0b3b29] active:scale-95 disabled:opacity-40">
           Enviar
         </button>
       </div>
@@ -436,7 +496,7 @@ function NumericPad({ digits, setDigits, onSend, sending }: { digits: string; se
   );
 }
 
-// ---------- resultado da questão ----------
+// ---------- resultado da questão (sem pontos) ----------
 function Result({ state }: { state: PlayerState }) {
   const a = state.answer;
   const right = a?.correct === true;
@@ -446,44 +506,46 @@ function Result({ state }: { state: PlayerState }) {
     .join(" ou ");
   return (
     <div className="flex flex-1 flex-col items-center justify-center gap-4 text-center text-white">
-      <div className={`grid h-32 w-32 place-items-center rounded-full text-[64px] shadow-2xl ${!a ? "bg-slate-500" : right ? "bg-green-500" : "bg-red-500"}`}>
+      <div className={`grid h-32 w-32 place-items-center rounded-full text-[64px] shadow-2xl ${!a ? "bg-slate-500" : right ? "bg-[#1f9d55]" : "bg-[#d64545]"}`}>
         {!a ? "⏱" : right ? "✔" : "✖"}
       </div>
       <h2 className="text-[34px] font-black">{!a ? "Não respondeu" : right ? "Acertou!" : "Errou"}</h2>
-      {right && <p className="rounded-full bg-lime px-5 py-1.5 text-[22px] font-black text-brand-900">+{a?.points} pontos</p>}
       {!right && correctText && (
         <div className="rounded-2xl bg-white px-4 py-3 text-[16px] font-bold text-slate-900">
           Resposta certa: <MathPreview text={correctText} />
         </div>
       )}
-      <p className="text-[20px] font-extrabold">
-        Você está em {state.player.rank}º lugar <span className="text-white/75">de {state.player.players}</span>
-      </p>
-      {state.status === "ranking" && state.top && (
-        <ol className="w-full max-w-sm space-y-1.5">
-          {state.top.map((t, i) => (
-            <li key={t.name} className={`flex items-center gap-3 rounded-xl px-4 py-2 text-[16px] font-extrabold ${t.name === state.player.name ? "bg-lime text-brand-900" : "bg-white/90 text-slate-900"}`}>
-              <span className="w-7">{i + 1}º</span>
-              <span className="min-w-0 flex-1 truncate text-left">{t.name}</span>
-              <span className="tabular-nums">{t.score}</span>
-            </li>
-          ))}
-        </ol>
-      )}
+      <p className="text-[15px] font-semibold text-white/80">Os pontos e o ranking só aparecem na cerimônia, no final.</p>
     </div>
   );
 }
 
 function Final({ state, onLeave }: { state: PlayerState; onLeave: () => void }) {
-  const medal = ["🥇", "🥈", "🥉"][state.player.rank - 1] ?? "🎉";
+  // até o professor revelar o campeão, o celular só pede para olhar o telão
+  if (state.ceremony_step < 3 || state.player.rank === null) {
+    return (
+      <div className="flex flex-1 flex-col items-center justify-center gap-4 text-center text-white">
+        <p className="animate-bounce text-[80px] leading-none">🏆</p>
+        <h2 className="text-[30px] font-black">Fim de jogo!</h2>
+        <p className="text-[18px] font-bold text-white/85">Olhe para o telão: a cerimônia vai revelar o 3º, o 2º e o campeão.</p>
+        {state.player.hits !== null && (
+          <p className="rounded-full bg-white/15 px-4 py-2 text-[15px] font-bold">
+            Você acertou {state.player.hits} de {state.count}
+          </p>
+        )}
+      </div>
+    );
+  }
+  const medal = ["🏆", "🥈", "🥉"][state.player.rank - 1] ?? "🎉";
   return (
     <div className="flex flex-1 flex-col items-center justify-center gap-4 text-center text-white">
       <p className="text-[80px] leading-none">{medal}</p>
-      <h2 className="text-[34px] font-black">Fim de jogo!</h2>
-      <p className="text-[22px] font-extrabold">
-        {state.player.rank}º lugar · {state.player.score} pontos
+      <h2 className="text-[34px] font-black">{state.player.rank}º lugar</h2>
+      <p className="text-[22px] font-extrabold text-[#7cc520]">{state.player.score} pontos</p>
+      <p className="text-[16px] font-semibold text-white/85">
+        Acertou {state.player.hits} de {state.count} · {state.player.players} participante(s)
       </p>
-      <button onClick={onLeave} className="mt-6 rounded-2xl bg-white px-6 py-3 text-[16px] font-black text-violet-900">
+      <button onClick={onLeave} className="mt-6 rounded-2xl bg-white px-6 py-3 text-[16px] font-black text-[#0b3b29]">
         Sair
       </button>
     </div>
@@ -492,11 +554,12 @@ function Final({ state, onLeave }: { state: PlayerState; onLeave: () => void }) 
 
 function Locked() {
   return (
-    <div className="fixed inset-0 z-50 grid place-items-center bg-red-700/95 p-6 text-center text-white">
+    <div className="fixed inset-0 z-50 grid place-items-center bg-[#b91c1c]/95 p-6 text-center text-white">
       <div className="flex flex-col items-center gap-4">
-        <Lock size={64} />
+        <span className="text-[72px] leading-none">🚨</span>
+        <Lock size={48} />
         <h2 className="text-[30px] font-black">Jogo bloqueado</h2>
-        <p className="max-w-xs text-[17px] font-semibold">Você saiu da tela do jogo. Chame o professor para liberar a sua equipe.</p>
+        <p className="max-w-xs text-[17px] font-semibold">Você saiu da tela do jogo e o seu nome apareceu no telão. Chame o professor para liberar.</p>
       </div>
     </div>
   );

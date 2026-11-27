@@ -42,11 +42,13 @@ export function newPin(rand: () => number = Math.random): string {
   return String(100000 + Math.floor(rand() * 900000));
 }
 
-/** Cores e formas das alternativas (estilo game show). */
-export const OPTION_STYLES = [
-  { bg: "#e21b3c", shape: "▲" },
-  { bg: "#1368ce", shape: "◆" },
-  { bg: "#d89e00", shape: "●" },
-  { bg: "#26890c", shape: "■" },
-  { bg: "#864cbf", shape: "★" },
-] as const;
+/** Identidade do app no jogo: verde-escuro, verde e verde-limão. */
+export const GAME_COLORS = {
+  dark: "#0b3b29",
+  deep: "#0f5132",
+  green: "#1f9d55",
+  lime: "#7cc520",
+  right: "#1f9d55",
+  wrong: "#d64545",
+  none: "#94a3b8",
+} as const;

@@ -13,7 +13,7 @@ export default async function JogoPage({ params }: { params: Promise<{ id: strin
   const supabase = await createClient();
   const { data: game } = await supabase
     .from("games")
-    .select("id, title, pin, team_size, status, current_index, question_started_at, question_count")
+    .select("*")
     .eq("id", id)
     .maybeSingle();
   if (!game) notFound();
