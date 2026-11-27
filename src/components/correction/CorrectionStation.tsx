@@ -27,7 +27,7 @@ interface Props {
   annulPolicy: AnnulPolicy;
   answerKey: AnswerKeyItem[];
   specs: SheetQuestionSpec[];
-  sheets: { sheet_number: number; student_id: string | null; version?: number | null }[];
+  sheets: { sheet_number: number; student_id: string | null; version?: number | null; layout_version?: number | null }[];
   /** Versões A–D: ordem das questões de cada versão (posição da versão A por nº impresso). */
   versionOrders?: number[][] | null;
   students: StationStudent[];
@@ -43,6 +43,8 @@ interface Shot {
   version: number;
   /** De onde veio a versão: pintada pelo aluno, do cartão impresso ou não identificada. */
   versionFrom: "marked" | "card" | "none";
+  /** Cartão impresso no desenho antigo (antes de as questões ocuparem as 4 colunas). */
+  legacy: boolean;
 }
 
 type Banner =
@@ -160,6 +162,7 @@ export function CorrectionStation(props: Props) {
         homography: shot.read.homography!,
         specs,
         key: keyOf(shot.version),
+        legacy: shot.legacy,
         answers,
         marked: markedOf(shot.read),
         grade,
@@ -270,13 +273,20 @@ export function CorrectionStation(props: Props) {
   const capture = useCallback(
     (source: HTMLVideoElement | HTMLImageElement): Shot | null => {
       const photo = toCanvas(source, PHOTO_SIDE);
-      const read = readCanvas(photo, specs, orders?.length ?? 1);
+      let read = readCanvas(photo, specs, orders?.length ?? 1);
       if (!read.ok || !read.homography) return null;
+      // cartão impresso antes da mudança de desenho: lê de novo no desenho antigo
+      const printed = read.sheetNumber !== null ? props.sheets.find((s) => s.sheet_number === read.sheetNumber) : undefined;
+      const legacy = !!printed && (printed.layout_version ?? 1) < 4;
+      if (legacy) {
+        const again = readCanvas(photo, specs, orders?.length ?? 1, true);
+        if (again.ok && again.homography) read = again;
+      }
       if (read.sheetNumber !== null) recent.current.set(read.sheetNumber, Date.now());
       const v = versionOfRead(read);
-      return { photo, read, version: v.version, versionFrom: v.from };
+      return { photo, read, version: v.version, versionFrom: v.from, legacy };
     },
-    [specs, versionOfRead, orders],
+    [specs, versionOfRead, orders, props.sheets],
   );
 
   // leitura automática contínua

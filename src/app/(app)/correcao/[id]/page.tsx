@@ -72,10 +72,11 @@ export default async function CorrigirPage({ params }: { params: Promise<{ id: s
             annulPolicy={assessment.annul_policy}
             answerKey={keyFromQuestions(questions)}
             specs={specs}
-            sheets={((sheets ?? []) as { sheet_number: number; student_id: string | null; version?: number | null }[]).map((s) => ({
+            sheets={((sheets ?? []) as { sheet_number: number; student_id: string | null; version?: number | null; layout_version?: number | null }[]).map((s) => ({
               sheet_number: s.sheet_number,
               student_id: s.student_id,
               version: s.version ?? 0,
+              layout_version: s.layout_version ?? 1,
             }))}
             versionOrders={(assessment.versions ?? 1) > 1 ? versionOrders(questions, assessment.versions ?? 1, id) : null}
             students={students}

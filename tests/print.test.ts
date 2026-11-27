@@ -28,6 +28,8 @@ function fakeSupabase() {
         return q;
       },
       order: () => q,
+      in: () => q,
+      update: () => q,
       maybeSingle: async () => ({ data: rows[0] ?? null }),
       single: async () => ({ data: (inserted ?? rows)[0] ?? null }),
       insert: (vals: Record<string, unknown>[]) => {

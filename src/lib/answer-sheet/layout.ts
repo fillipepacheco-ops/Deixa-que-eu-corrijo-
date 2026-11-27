@@ -9,7 +9,10 @@
  */
 import { CODE_TOTAL_BITS } from "./code";
 
-export const LAYOUT_VERSION = 3; // v2: bolhas menores (3,3 mm) · v3: Tipo B (centena/dezena/unidade)
+export const LAYOUT_VERSION = 4; // v2: bolhas menores (3,3 mm) · v3: Tipo B · v4: questões espalhadas pelas 4 colunas
+/** Cartões impressos antes da v4 (as questões enchiam a coluna da esquerda primeiro). */
+export const LEGACY_LAYOUT_VERSION = 3;
+const MAX_COLUMNS = 4;
 export const PAGE_W = 210;
 export const PAGE_H = 297;
 
@@ -146,7 +149,31 @@ export function rollGridLayout(): RollBubble[] {
   return out;
 }
 
-export function sheetLayout(questions: SheetQuestionSpec[], opts: { versions?: number } = {}): SheetLayout {
+/**
+ * Linhas por coluna para espalhar as questões pelas 4 colunas de forma equilibrada
+ * (o cartão fica harmônico, sem metade da folha vazia).
+ */
+export function balancedRows(needs: number[]): number {
+  if (!needs.length) return ROWS_PER_COLUMN;
+  const total = needs.reduce((a, b) => a + b, 0);
+  const fits = (rows: number) => {
+    let col = 0;
+    let row = 0;
+    for (const n of needs) {
+      if (row + n > rows) {
+        col++;
+        row = 0;
+      }
+      row += n;
+    }
+    return col < MAX_COLUMNS;
+  };
+  let rows = Math.max(Math.max(...needs), Math.ceil(total / MAX_COLUMNS), Math.min(total, 5));
+  while (rows < ROWS_PER_COLUMN && !fits(rows)) rows++;
+  return Math.min(rows, ROWS_PER_COLUMN);
+}
+
+export function sheetLayout(questions: SheetQuestionSpec[], opts: { versions?: number; legacy?: boolean } = {}): SheetLayout {
   const units = questions.reduce((n, q) => n + (q.numeric ? NUMERIC_ROWS : 1), 0);
   if (questions.length > MAX_QUESTIONS || units > MAX_QUESTIONS) {
     throw new Error(
@@ -164,16 +191,31 @@ export function sheetLayout(questions: SheetQuestionSpec[], opts: { versions?: n
 
   // As questões descem pela coluna; um bloco do Tipo B ocupa NUMERIC_ROWS linhas
   // e passa inteiro para a próxima coluna se não couber.
+  // v4: colunas equilibradas e centralizadas na folha. Legado (v3): enche a coluna da esquerda primeiro.
+  const needs = questions.map((q) => (q.numeric ? NUMERIC_ROWS : 1));
+  const rowsPerColumn = opts.legacy ? ROWS_PER_COLUMN : balancedRows(needs);
+  let usedCols = 1;
+  {
+    let r = 0;
+    for (const n of needs) {
+      if (r + n > rowsPerColumn) {
+        usedCols++;
+        r = 0;
+      }
+      r += n;
+    }
+  }
+  const gridLeft = opts.legacy ? GRID_LEFT : GRID_LEFT + ((MAX_COLUMNS - Math.min(usedCols, MAX_COLUMNS)) * COLUMN_PITCH) / 2;
   let col = 0;
   let row = 0;
   const mcColumns = new Set<number>();
   for (const q of questions) {
     const need = q.numeric ? NUMERIC_ROWS : 1;
-    if (row + need > ROWS_PER_COLUMN) {
+    if (row + need > rowsPerColumn) {
       col++;
       row = 0;
     }
-    const baseX = GRID_LEFT + col * COLUMN_PITCH;
+    const baseX = gridLeft + col * COLUMN_PITCH;
     const y = GRID_TOP + row * ROW_PITCH;
     questionLabels.push({ number: q.number, x: baseX, y });
     if (q.numeric) {
@@ -201,13 +243,13 @@ export function sheetLayout(questions: SheetQuestionSpec[], opts: { versions?: n
   for (let c = 0; c < columns; c++) {
     if (!mcColumns.has(c)) continue;
     headerLabels.forEach((label, j) =>
-      columnHeaders.push({ label, x: GRID_LEFT + c * COLUMN_PITCH + 9 + j * OPTION_PITCH, y: GRID_TOP - 7 }),
+      columnHeaders.push({ label, x: gridLeft + c * COLUMN_PITCH + 9 + j * OPTION_PITCH, y: GRID_TOP - 7 }),
     );
   }
 
   const { cells, guards } = codeCellsLayout();
   return {
-    version: LAYOUT_VERSION,
+    version: opts.legacy ? LEGACY_LAYOUT_VERSION : LAYOUT_VERSION,
     fiducials: FIDUCIALS,
     codeCells: cells,
     codeGuards: guards,

@@ -6,7 +6,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { PDFDocument } from "pdf-lib";
 import { generateAnswerSheetsPdf, type AnswerSheetCard } from "@/lib/pdf/answer-sheet-pdf";
 import { generateAssessmentPdf } from "@/lib/pdf/assessment-pdf";
-import { sheetQuestionsFrom } from "@/lib/answer-sheet/layout";
+import { LAYOUT_VERSION, sheetQuestionsFrom } from "@/lib/answer-sheet/layout";
 import { examHeader } from "@/lib/assessment/header";
 import { attachQuestionImages, loadAssessment, loadSchoolLogo, loadStudents } from "./assessment-data";
 import { questionsForVersion, versionForIndex, versionLabel, versionOrders } from "@/lib/versions/versions";
@@ -45,7 +45,7 @@ export async function ensureCards(
   const byStudent = new Map(sheets.filter((s) => s.student_id).map((s) => [s.student_id as string, card(s)]));
   const blanks = sheets.filter((s) => !s.student_id).map(card);
 
-  const withVersion = <T extends object>(row: T, v: number) => (versions > 1 ? { ...row, version: v } : row);
+  const withVersion = <T extends object>(row: T, v: number) => ({ ...(versions > 1 ? { ...row, version: v } : row), layout_version: LAYOUT_VERSION });
   const missingBlanks = Math.max(0, blankCount - blanks.length);
   const toInsert = [
     ...students
@@ -124,6 +124,10 @@ export async function buildPrintPdf(
   let cardsFor: ((cards: AnswerSheetCard[], v: number) => Promise<Uint8Array>) | null = null;
   let cardOf = new Map<string, Card>();
   let blanks: Card[] = [];
+  const markPrinted = async (numbers: number[]) => {
+    // estes cartões saem no desenho atual (v4): a câmera passa a ler neste desenho
+    if (numbers.length) await supabase.from("answer_sheets").update({ layout_version: LAYOUT_VERSION }).eq("assessment_id", assessmentId).in("sheet_number", numbers);
+  };
   if (needsCards) {
     if (!specs.length && opts.doc !== "prova") throw new PrintError("Cadastre ao menos uma questão objetiva para gerar o cartão-resposta.");
     const blankCount = opts.doc === "prova" ? 0 : wholeClass ? (all.length ? EXTRA_BLANK : BLANK_WITHOUT_CLASS) : 0;
@@ -166,6 +170,10 @@ export async function buildPrintPdf(
       i = j;
     }
   };
+
+  if (opts.doc !== "prova") {
+    await markPrinted([...students.map((s) => cardOf.get(s.id)?.number).filter((n): n is number => !!n), ...blanks.map((b) => b.number)]);
+  }
 
   if (opts.doc === "prova") {
     if (opts.blank || students.length === 0) {
