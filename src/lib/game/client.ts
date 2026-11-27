@@ -57,5 +57,7 @@ export function rpcError(e: { message?: string } | null | undefined) {
 export async function rpc<T>(supabase: SupabaseClient, fn: string, args: Record<string, unknown>): Promise<T> {
   const { data, error } = await supabase.rpc(fn, args);
   if (error) throw new Error(rpcError(error));
+  // erros "suaves" do banco (ex.: PIN errado) chegam como { error: "..." }
+  if (data && typeof data === "object" && typeof (data as { error?: unknown }).error === "string") throw new Error((data as { error: string }).error);
   return data as T;
 }
