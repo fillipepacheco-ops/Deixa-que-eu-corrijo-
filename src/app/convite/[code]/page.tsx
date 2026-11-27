@@ -9,7 +9,7 @@ import { signOut } from "@/services/auth";
 
 export const metadata: Metadata = { title: "Convite — Prova Multi" };
 
-type Info = { teacher_name: string; discipline: string; email: string; question_count: number; title: string; school: string | null; coordinator: string | null; status: string };
+type Info = { teacher_name: string; discipline: string; email: string; question_count: number; title: string; school: string | null; coordinator: string | null; status: string; has_account?: boolean };
 
 export default async function ConvitePage({ params }: { params: Promise<{ code: string }> }) {
   const { code } = await params;
@@ -66,7 +66,12 @@ export default async function ConvitePage({ params }: { params: Promise<{ code: 
             </div>
           ) : (
             <>
-              <AuthForm initialMode="criar" lockedEmail={info.email} next="/colaborar" />
+              <p className="mb-4 rounded-xl bg-brand-50 px-3 py-2 text-[13px] text-brand-900">
+                {info.has_account
+                  ? `Você já tem conta no app com ${info.email}: é só entrar com a sua senha de sempre.`
+                  : `Crie a sua conta com o e-mail ${info.email}. É gratuito para participar desta prova.`}
+              </p>
+              <AuthForm initialMode={info.has_account ? "entrar" : "criar"} lockedEmail={info.email} next="/colaborar" />
               <p className="mt-4 text-center text-[12px] text-muted">
                 Se pedir confirmação, abra o link que chegou no seu e-mail e depois volte a este convite.{" "}
                 <Link href="/login" className="font-semibold text-brand-700 underline">

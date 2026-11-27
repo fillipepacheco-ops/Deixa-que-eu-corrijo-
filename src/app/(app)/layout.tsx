@@ -15,12 +15,19 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   if (!user) redirect("/login");
 
   const access = await loadAccess(supabase, user.id);
+  // liga os convites da Prova Multi feitos para o e-mail desta conta (pagante ou não)
+  const { data: invitesCount } = await supabase.rpc("claim_invites");
   // Sem assinatura em dia → página de pagamento (o gestor sempre entra).
   if (!access.isAdmin && !canUseApp(access.state)) {
     // professor convidado da Prova Multi (sem assinatura): vai direto para as questões dele
-    const { data: invites } = await supabase.rpc("claim_invites");
-    redirect(Number(invites) > 0 ? "/colaborar" : "/assinatura");
+    redirect(Number(invitesCount) > 0 ? "/colaborar" : "/assinatura");
   }
+  // convites ainda não enviados → aviso no topo
+  const { data: openInvites } =
+    Number(invitesCount) > 0
+      ? await supabase.from("multi_slots").select("id, discipline, multi_exams(title, status)").eq("teacher_id", user.id).is("submitted_at", null)
+      : { data: [] as { id: string; discipline: string; multi_exams: unknown }[] };
+  const pending = (openInvites ?? []).filter((s) => (s.multi_exams as { status?: string } | null)?.status === "aberta");
 
   const [{ data: profile }, { schools, current }] = await Promise.all([
     supabase.from("profiles").select("full_name").eq("id", user.id).maybeSingle(),
@@ -28,6 +35,18 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   ]);
 
   const paid = access.sub?.paid_until ?? null;
+  const inviteBanner = pending.length ? (
+    <Link
+      href={pending.length === 1 ? `/colaborar/${pending[0].id}` : "/colaborar"}
+      className="mb-4 flex flex-wrap items-center gap-3 rounded-2xl bg-lime px-4 py-3 text-[14px] text-brand-900 shadow-sm"
+    >
+      <span className="flex-1 font-semibold">
+        A coordenação convidou você para a Prova Multi
+        {pending.length === 1 ? ` (${pending[0].discipline} · ${(pending[0].multi_exams as { title?: string } | null)?.title ?? ""})` : ` (${pending.length} provas)`}.
+      </span>
+      <span className="rounded-lg bg-brand-900 px-3 py-1.5 text-[13px] font-bold text-white">Mandar as questões</span>
+    </Link>
+  ) : null;
   const banner =
     !access.isAdmin && paid && (access.state === "vencendo" || access.state === "atrasado") ? (
       <div
@@ -53,7 +72,12 @@ export default async function AppLayout({ children }: { children: React.ReactNod
       schools={schools}
       currentSchool={current?.id ?? ""}
       isAdmin={access.isAdmin}
-      banner={banner}
+      banner={
+        <>
+          {inviteBanner}
+          {banner}
+        </>
+      }
     >
       {children}
     </AppShell>
