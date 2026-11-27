@@ -149,6 +149,19 @@ export async function generateAssessmentPdf(input: AssessmentPdfInput): Promise<
     const indent = cfg.questionHeading === "inline" ? fs * 1.9 : 0;
     const textW = colW - indent;
 
+    // Começo de uma seção (ex.: disciplina da Prova Multi): faixa com o nome.
+    const section = (q.section ?? "").trim();
+    if (section && section !== (questions[idx - 1]?.section ?? "").trim()) {
+      const label = sanitize(bold, section.toUpperCase());
+      pieces.push({
+        h: fs * 2.6,
+        draw: (page, x, top) => {
+          page.drawRectangle({ x, y: A4.h - top - fs * 1.8, width: colW, height: fs * 1.8, color: BRAND.dark });
+          drawTextTop(page, label.length > 60 ? label.slice(0, 57) + "..." : label, { x: x + 6, top: top + fs * 0.42, size: fs * 0.95, font: bold, color: BRAND.white });
+        },
+      });
+    }
+
     // Título da questão (modelo larga escala).
     if (cfg.questionHeading === "boxed") {
       const label = `QUESTÃO ${String(number).padStart(2, "0")}`;

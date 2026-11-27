@@ -12,6 +12,11 @@ const MSG: Record<string, string> = {
   "User already registered": "Já existe uma conta com este e-mail.",
 };
 const translate = (m: string) => MSG[m] ?? m;
+/** Só caminhos internos (evita redirecionar para outro site). */
+const safeNext = (v: FormDataEntryValue | null, dflt: string) => {
+  const s = String(v ?? "");
+  return /^\/(?![\/\\])[\w\-/?=&.%]*$/.test(s) ? s : dflt;
+};
 
 export async function signIn(_: AuthState, formData: FormData): Promise<AuthState> {
   const email = String(formData.get("email") ?? "").trim();
@@ -21,7 +26,7 @@ export async function signIn(_: AuthState, formData: FormData): Promise<AuthStat
   const supabase = await createClient();
   const { error } = await supabase.auth.signInWithPassword({ email, password });
   if (error) return { error: translate(error.message) };
-  redirect("/dashboard");
+  redirect(safeNext(formData.get("next"), "/dashboard"));
 }
 
 export async function signUp(_: AuthState, formData: FormData): Promise<AuthState> {
@@ -43,7 +48,7 @@ export async function signUp(_: AuthState, formData: FormData): Promise<AuthStat
   if (!data.session) {
     return { message: "Conta criada! Enviamos um link de confirmação para o seu e-mail. Depois de confirmar, entre para fazer o pagamento." };
   }
-  redirect("/assinatura");
+  redirect(safeNext(formData.get("next"), "/assinatura"));
 }
 
 export async function signOut() {

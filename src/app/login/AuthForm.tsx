@@ -4,7 +4,12 @@ import { useActionState, useState } from "react";
 import { signIn, signUp, type AuthState } from "@/services/auth";
 import { SubmitButton } from "@/components/ui/SubmitButton";
 
-export function AuthForm({ plan, initialMode = "entrar" }: { plan?: "professor" | "direcao"; initialMode?: "entrar" | "criar" } = {}) {
+export function AuthForm({
+  plan,
+  initialMode = "entrar",
+  lockedEmail,
+  next,
+}: { plan?: "professor" | "direcao"; initialMode?: "entrar" | "criar"; lockedEmail?: string; next?: string } = {}) {
   const [mode, setMode] = useState<"entrar" | "criar">(initialMode);
   const [inState, inAction] = useActionState<AuthState, FormData>(signIn, {});
   const [upState, upAction] = useActionState<AuthState, FormData>(signUp, {});
@@ -21,6 +26,7 @@ export function AuthForm({ plan, initialMode = "entrar" }: { plan?: "professor" 
 
       <form action={mode === "entrar" ? inAction : upAction} className="mt-7 space-y-4">
         {mode === "criar" && plan && <input type="hidden" name="plan" value={plan} />}
+        {next && <input type="hidden" name="next" value={next} />}
         {mode === "criar" && (
           <div>
             <label className="label" htmlFor="full_name">Nome completo</label>
@@ -29,7 +35,16 @@ export function AuthForm({ plan, initialMode = "entrar" }: { plan?: "professor" 
         )}
         <div>
           <label className="label" htmlFor="email">E-mail</label>
-          <input className="field" id="email" name="email" type="email" autoComplete="email" required />
+          <input
+            className="field read-only:bg-brand-50"
+            id="email"
+            name="email"
+            type="email"
+            autoComplete="email"
+            required
+            defaultValue={lockedEmail}
+            readOnly={!!lockedEmail}
+          />
         </div>
         <div>
           <label className="label" htmlFor="password">Senha</label>

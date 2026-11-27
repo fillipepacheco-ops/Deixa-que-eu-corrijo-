@@ -16,7 +16,11 @@ export default async function AppLayout({ children }: { children: React.ReactNod
 
   const access = await loadAccess(supabase, user.id);
   // Sem assinatura em dia → página de pagamento (o gestor sempre entra).
-  if (!access.isAdmin && !canUseApp(access.state)) redirect("/assinatura");
+  if (!access.isAdmin && !canUseApp(access.state)) {
+    // professor convidado da Prova Multi (sem assinatura): vai direto para as questões dele
+    const { data: invites } = await supabase.rpc("claim_invites");
+    redirect(Number(invites) > 0 ? "/colaborar" : "/assinatura");
+  }
 
   const [{ data: profile }, { schools, current }] = await Promise.all([
     supabase.from("profiles").select("full_name").eq("id", user.id).maybeSingle(),

@@ -23,6 +23,8 @@ export default async function AssinaturaPage() {
   const p = PLANS[plan];
   const ok = access.isAdmin || canUseApp(access.state);
   const paid = access.sub?.paid_until ?? null;
+  const { data: invites } = await supabase.rpc("claim_invites");
+  const hasInvites = Number(invites) > 0;
 
   const headline = {
     aguardando: "Falta só o pagamento",
@@ -56,6 +58,13 @@ export default async function AssinaturaPage() {
           </form>
         </div>
 
+        {hasInvites && (
+          <Link href="/colaborar" className="mb-4 block rounded-2xl bg-lime px-5 py-4 text-brand-900 shadow-lg">
+            <span className="block text-[13px] font-bold uppercase tracking-wide">Convite da coordenação</span>
+            <span className="block text-[17px] font-extrabold">Ir para as suas questões da Prova Multi →</span>
+            <span className="block text-[13px]">Gratuito para você. A assinatura abaixo é só para usar o app nas suas turmas.</span>
+          </Link>
+        )}
         <div className="rounded-3xl bg-white p-6 shadow-2xl sm:p-8">
           <div className="flex items-center gap-3">
             {ok ? <CheckCircle2 className="text-brand-500" size={28} /> : access.state === "suspenso" ? <PauseCircle className="text-red-600" size={28} /> : <CreditCard className="text-brand-700" size={28} />}

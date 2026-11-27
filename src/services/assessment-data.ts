@@ -30,6 +30,7 @@ export interface QuestionRow {
   annulled: boolean;
   table_data: { rows: string[][] } | null;
   image_path: string | null;
+  section?: string | null;
 }
 
 export function toAssessment(row: AssessmentRow): Assessment {
@@ -47,6 +48,7 @@ export function toAssessment(row: AssessmentRow): Assessment {
     max_score: Number(row.max_score),
     annul_policy: row.annul_policy,
     term: (row as { term?: number | null }).term ?? null,
+    versions: Math.max(1, Number((row as { versions?: number }).versions ?? 1) || 1),
   };
 }
 
@@ -67,6 +69,7 @@ export function toQuestion(row: QuestionRow): AssessmentQuestion {
     table_data: row.table_data,
     image: null,
     image_path: row.image_path,
+    section: row.section ?? null,
   };
 }
 
@@ -80,7 +83,7 @@ export async function loadAssessment(supabase: SupabaseClient, id: string) {
   if (!row) return null;
   const { data: qs } = await supabase
     .from("assessment_questions")
-    .select("id, position, type, statement, options, correct_answers, weight, annulled, table_data, image_path")
+    .select("*") // inclui "section" quando a migração 0011 já rodou
     .eq("assessment_id", id)
     .order("position");
   return {

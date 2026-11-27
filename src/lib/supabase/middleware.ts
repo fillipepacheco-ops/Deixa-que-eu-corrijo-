@@ -3,7 +3,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { SUPABASE_KEY, SUPABASE_URL } from "./env";
 
 /** Rotas acessíveis sem login. */
-const PUBLIC_PATHS = ["/login", "/auth", "/jogar", "/planos", "/assinar"]; // /jogar = celular do aluno no modo game (sem login)
+const PUBLIC_PATHS = ["/login", "/auth", "/jogar", "/planos", "/assinar", "/convite"]; // /jogar = celular do aluno no modo game (sem login)
 
 export async function updateSession(request: NextRequest) {
   let response = NextResponse.next({ request });

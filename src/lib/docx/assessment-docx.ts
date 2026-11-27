@@ -193,6 +193,16 @@ function coverPage(h: ExamHeader, opts: DocxOptions): (Paragraph | Table)[] {
   return out;
 }
 
+/** Faixa com o nome da seção (disciplina na Prova Multi). */
+function sectionHeading(text: string): Paragraph {
+  return new Paragraph({
+    keepNext: true,
+    spacing: { before: 280, after: 60 },
+    shading: { type: ShadingType.CLEAR, fill: DARK, color: "auto" },
+    children: [new TextRun({ text: ` ${text.toUpperCase()} `, bold: true, size: SIZE, color: "FFFFFF", font: FONT })],
+  });
+}
+
 function questionBlocks(q: AssessmentQuestion, number: number): (Paragraph | Table)[] {
   const blocks: (Paragraph | Table)[] = [];
   // Sem "manter com o próximo" em tudo: o Word encaixa as questões uma embaixo da outra
@@ -468,7 +478,12 @@ export async function generateAssessmentDocx(header: ExamHeader, questions: Asse
         },
         headers: { default: runningHeader },
         footers: { default: footer },
-        children: sorted.flatMap((q, i) => questionBlocks(q, i + 1)),
+        children: sorted.flatMap((q, i) => [
+          ...((q.section ?? "").trim() && (q.section ?? "").trim() !== (sorted[i - 1]?.section ?? "").trim()
+            ? [sectionHeading((q.section ?? "").trim())]
+            : []),
+          ...questionBlocks(q, i + 1),
+        ]),
       },
     ],
   });

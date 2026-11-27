@@ -12,6 +12,7 @@ import { MARKED_MIN } from "@/lib/omr/reader";
 import { buildProof } from "@/lib/correction/proof";
 import { loadImage, readCanvas, toCanvas } from "@/lib/correction/capture";
 import { saveCorrection } from "@/services/corrections";
+import { answersToBase, keyForVersion, versionLabel } from "@/lib/versions/versions";
 
 export interface StationStudent {
   id: string;
@@ -26,7 +27,9 @@ interface Props {
   annulPolicy: AnnulPolicy;
   answerKey: AnswerKeyItem[];
   specs: SheetQuestionSpec[];
-  sheets: { sheet_number: number; student_id: string | null }[];
+  sheets: { sheet_number: number; student_id: string | null; version?: number | null }[];
+  /** Versões A–D: ordem das questões de cada versão (posição da versão A por nº impresso). */
+  versionOrders?: number[][] | null;
   students: StationStudent[];
   corrected: Record<string, number>; // aluno → nota já salva
   /** Logo da escola (link temporário) para o comprovante. */
@@ -36,6 +39,8 @@ interface Props {
 interface Shot {
   photo: HTMLCanvasElement;
   read: ReadResult;
+  /** Versão da prova deste cartão (0 = A). */
+  version: number;
 }
 
 type Banner =
@@ -119,9 +124,27 @@ export function CorrectionStation(props: Props) {
     [props.sheets, students],
   );
 
+  // Versões: o cartão é lido na numeração da versão do aluno; a nota é salva na numeração da versão A.
+  const orders = props.versionOrders && props.versionOrders.length > 1 ? props.versionOrders : null;
+  const keyOf = useCallback((v: number) => (orders?.[v] ? keyForVersion(answerKey, orders[v]) : answerKey), [orders, answerKey]);
+  const versionOfRead = useCallback(
+    (r: ReadResult): number => {
+      if (!orders) return 0;
+      let sheet = r.sheetNumber !== null ? props.sheets.find((s) => s.sheet_number === r.sheetNumber) : undefined;
+      if (!sheet && r.rollNumber !== null) {
+        const st = students.find((s) => s.roll_number === r.rollNumber);
+        sheet = st ? props.sheets.find((s) => s.student_id === st.id) : undefined;
+      }
+      const v = sheet?.version ?? 0;
+      return v >= 0 && v < orders.length ? v : 0;
+    },
+    [orders, props.sheets, students],
+  );
+
   const gradeOf = useCallback(
-    (answers: Record<number, GivenAnswer>) => gradeSubmission(answerKey, answers, { maxScore: props.maxScore, annulPolicy: props.annulPolicy }),
-    [answerKey, props.maxScore, props.annulPolicy],
+    (answers: Record<number, GivenAnswer>, version = 0) =>
+      gradeSubmission(keyOf(version), answers, { maxScore: props.maxScore, annulPolicy: props.annulPolicy }),
+    [keyOf, props.maxScore, props.annulPolicy],
   );
 
   const proofOf = useCallback(
@@ -130,7 +153,7 @@ export function CorrectionStation(props: Props) {
         photo: shot.photo,
         homography: shot.read.homography!,
         specs,
-        key: answerKey,
+        key: keyOf(shot.version),
         answers,
         marked: markedOf(shot.read),
         grade,
@@ -139,7 +162,7 @@ export function CorrectionStation(props: Props) {
         when: new Date(),
         logo,
       }).toDataURL("image/jpeg", 0.85),
-    [specs, answerKey, props.assessmentTitle, logo],
+    [specs, keyOf, props.assessmentTitle, logo],
   );
 
   /** Envia o comprovante e grava a nota no banco. Devolve a nota salva. */
@@ -154,18 +177,20 @@ export function CorrectionStation(props: Props) {
       const path = `${user.id}/${props.assessmentId}/${student.id}-${Date.now()}.jpg`;
       const { error } = await supabase.storage.from("answer-sheet-photos").upload(path, blob, { contentType: "image/jpeg" });
       if (error) throw new Error(error.message);
+      const order = orders?.[shot.version];
+      const base = order ? answersToBase(answers, order) : answers;
       const res = await saveCorrection(props.assessmentId, {
         studentId: student.id,
         sheetNumber: shot.read.sheetNumber,
-        answers: Object.fromEntries(Object.entries(answers).map(([k, v]) => [k, v ?? null])),
-        readDetails: shot.read.questions.map((q) => ({ n: q.number, fills: q.fills, conf: q.confidence })),
+        answers: Object.fromEntries(Object.entries(base).map(([k, v]) => [k, v ?? null])),
+        readDetails: shot.read.questions.map((q) => ({ n: order?.[q.number - 1] ?? q.number, printed: q.number, version: shot.version, fills: q.fills, conf: q.confidence })),
         imagePath: path,
       });
       if (!res.ok) throw new Error(res.error);
       setCorrected((c) => ({ ...c, [student.id]: res.score }));
       return res.score;
     },
-    [props.assessmentId],
+    [props.assessmentId, orders],
   );
 
   /**
@@ -178,7 +203,7 @@ export function CorrectionStation(props: Props) {
       setSaveError("");
       const ident = identify(shot.read);
       const answers = { ...shot.read.answers };
-      const grade = gradeOf(answers);
+      const grade = gradeOf(answers, shot.version);
       const student = students.find((s) => s.id === ident.id);
       if (!student || grade.needsReview || ident.source === "other-assessment") {
         setBanner(null);
@@ -240,9 +265,9 @@ export function CorrectionStation(props: Props) {
       const read = readCanvas(photo, specs);
       if (!read.ok || !read.homography) return null;
       if (read.sheetNumber !== null) recent.current.set(read.sheetNumber, Date.now());
-      return { photo, read };
+      return { photo, read, version: versionOfRead(read) };
     },
-    [specs],
+    [specs, versionOfRead],
   );
 
   // leitura automática contínua
@@ -323,7 +348,7 @@ export function CorrectionStation(props: Props) {
     setStudentId(ident.id);
     setAnswers({ ...review.read.answers });
   }, [review, ident.id]);
-  const grade = useMemo(() => gradeOf(answers), [gradeOf, answers]);
+  const grade = useMemo(() => gradeOf(answers, review?.version ?? 0), [gradeOf, answers, review]);
   const student = students.find((s) => s.id === studentId);
   const proofUrl = useMemo(
     () => (review?.read.homography ? proofOf(review, answers, grade, student?.name ?? "") : ""),
@@ -433,7 +458,8 @@ export function CorrectionStation(props: Props) {
             </div>
           )}
 
-          <QuestionGrid grade={grade} specs={specs} answerKey={answerKey} />
+          {orders && review && <p className="text-[13px] font-bold text-brand-700">Prova versão {versionLabel(review.version)} (numeração da versão do aluno)</p>}
+          <QuestionGrid grade={grade} specs={specs} answerKey={keyOf(review?.version ?? 0)} />
 
           {r.problems
             .filter((p) => !p.startsWith("Não foi possível identificar com segurança"))

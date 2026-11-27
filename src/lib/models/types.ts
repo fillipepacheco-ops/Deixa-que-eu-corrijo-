@@ -50,6 +50,8 @@ export interface AssessmentQuestion {
   /** Caminho da imagem no Storage (bucket question-images). */
   image_path?: string | null;
   table_data?: { rows: string[][] } | null;
+  /** Seção da prova (ex.: disciplina na Prova Multi). Muda de seção → título na prova. */
+  section?: string | null;
 }
 
 export interface Assessment {
@@ -67,6 +69,10 @@ export interface Assessment {
   annul_policy: AnnulPolicy;
   /** Bimestre escolhido pelo professor (1–4); null = automático. */
   term?: number | null;
+  /** Quantas versões (A–D) com as questões em ordem diferente. 1 = só a original. */
+  versions?: number;
+  /** Versão impressa nesta cópia (0 = A). */
+  version?: number | null;
 }
 
 export const CATEGORY_LABELS: Record<CouncilCategory, string> = {

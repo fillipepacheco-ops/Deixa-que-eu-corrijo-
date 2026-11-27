@@ -47,6 +47,8 @@ export interface Subscription {
   status: SubStatus;
   paid_until: string | null; // yyyy-mm-dd
   created_at?: string;
+  /** Professor convidado da Prova Multi (usa só a prova para a qual foi convidado). */
+  guest?: boolean;
 }
 
 export type AccessState =

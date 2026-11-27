@@ -6,6 +6,7 @@ import { createClient } from "@/lib/supabase/server";
 import { loadAssessment, loadStudents, schoolLogoUrl } from "@/services/assessment-data";
 import { sheetQuestionsFrom } from "@/lib/answer-sheet/layout";
 import { keyFromQuestions } from "@/lib/correction/key";
+import { versionOrders } from "@/lib/versions/versions";
 import { CorrectionStation } from "@/components/correction/CorrectionStation";
 import { ProofList, type ProofRow } from "@/components/correction/ProofList";
 import { EmptyState } from "@/components/ui/PageHeader";
@@ -22,7 +23,7 @@ export default async function CorrigirPage({ params }: { params: Promise<{ id: s
   const specs = sheetQuestionsFrom(questions);
   const [students, { data: sheets }, { data: subs }] = await Promise.all([
     loadStudents(supabase, row.class_id),
-    supabase.from("answer_sheets").select("sheet_number, student_id").eq("assessment_id", id),
+    supabase.from("answer_sheets").select("*").eq("assessment_id", id),
     supabase.from("submissions").select("student_id, score, correct_count, confirmed_at, image_path").eq("assessment_id", id),
   ]);
 
@@ -71,7 +72,12 @@ export default async function CorrigirPage({ params }: { params: Promise<{ id: s
             annulPolicy={assessment.annul_policy}
             answerKey={keyFromQuestions(questions)}
             specs={specs}
-            sheets={(sheets ?? []) as { sheet_number: number; student_id: string | null }[]}
+            sheets={((sheets ?? []) as { sheet_number: number; student_id: string | null; version?: number | null }[]).map((s) => ({
+              sheet_number: s.sheet_number,
+              student_id: s.student_id,
+              version: s.version ?? 0,
+            }))}
+            versionOrders={(assessment.versions ?? 1) > 1 ? versionOrders(questions, assessment.versions ?? 1, id) : null}
             students={students}
             corrected={corrected}
             schoolLogoUrl={await schoolLogoUrl(supabase, row.school_logo_path)}

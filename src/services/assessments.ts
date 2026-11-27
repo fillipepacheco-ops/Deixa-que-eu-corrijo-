@@ -306,3 +306,35 @@ export async function applyToClasses(assessmentId: string, _: FormState, formDat
   revalidatePath("/avaliacoes");
   return { ok: true, message: `Prova aplicada em: ${created.join(", ")}. Cada turma tem a sua cópia, com cartões e notas separados.` };
 }
+
+/**
+ * Versões da prova (A–D). Cada aluno recebe a versão pela ordem de chamada (1º A, 2º B…);
+ * os cartões já criados são redistribuídos — é preciso imprimir de novo.
+ */
+export async function setVersions(assessmentId: string, _: FormState, formData: FormData): Promise<FormState> {
+  const n = Math.max(1, Math.min(4, Math.floor(Number(formData.get("versions"))) || 1));
+  const supabase = await createClient();
+  const { data: a } = await supabase.from("assessments").select("id, class_id").eq("id", assessmentId).maybeSingle();
+  if (!a) return { error: "Avaliação não encontrada." };
+  const { error } = await supabase.from("assessments").update({ versions: n }).eq("id", assessmentId);
+  if (error) return { error: /versions/.test(error.message) ? "Rode antes a migração 0011_prova_multi.sql no Supabase." : error.message };
+
+  const [{ data: sheets }, { data: students }] = await Promise.all([
+    supabase.from("answer_sheets").select("id, student_id").eq("assessment_id", assessmentId).order("sheet_number"),
+    a.class_id
+      ? supabase.from("students").select("id").eq("class_id", a.class_id).eq("active", true).order("roll_number", { ascending: true, nullsFirst: false }).order("name")
+      : Promise.resolve({ data: [] as { id: string }[] }),
+  ]);
+  const idx = new Map((students ?? []).map((s, i) => [s.id as string, i]));
+  let blank = 0;
+  for (const sh of sheets ?? []) {
+    const i = sh.student_id ? (idx.get(sh.student_id) ?? 0) : blank++;
+    await supabase.from("answer_sheets").update({ version: n > 1 ? i % n : 0 }).eq("id", sh.id);
+  }
+  revalidatePath(`/avaliacoes/${assessmentId}`);
+  revalidatePath(`/correcao/${assessmentId}`);
+  return {
+    ok: true,
+    message: n > 1 ? `Prova em ${n} versões. Imprima as provas e os cartões de novo.` : "Prova em versão única. Imprima as provas e os cartões de novo.",
+  };
+}

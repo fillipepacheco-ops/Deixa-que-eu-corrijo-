@@ -88,7 +88,7 @@ export default async function GestaoPage({ searchParams }: { searchParams: Promi
         </Card>
         <Card className="p-4">
           <p className="text-[13px] font-semibold text-muted">Precisam de atenção</p>
-          <p className="text-[28px] font-extrabold text-red-700">{count("atrasado") + count("bloqueado") + count("aguardando")}</p>
+          <p className="text-[28px] font-extrabold text-red-700">{count("atrasado") + count("bloqueado") + rows.filter((r) => r.state === "aguardando" && !r.guest).length}</p>
         </Card>
       </div>
 
@@ -125,7 +125,9 @@ export default async function GestaoPage({ searchParams }: { searchParams: Promi
                     <p className="truncate text-[16px] font-extrabold text-brand-900">{r.full_name || "(sem nome)"}</p>
                     <p className="truncate text-[13px] text-muted">{r.email}</p>
                   </div>
-                  <span className={`rounded-full px-2.5 py-1 text-[12px] font-bold ${BADGE[r.state]}`}>{STATE_LABEL[r.state]}</span>
+                  <span className={`rounded-full px-2.5 py-1 text-[12px] font-bold ${BADGE[r.state]}`}>
+                    {r.state === "aguardando" && r.guest ? "Convidado · Prova Multi" : STATE_LABEL[r.state]}
+                  </span>
                 </div>
                 <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-[13px] text-muted">
                   <form action={adminChangePlan.bind(null, r.user_id)} className="flex items-center gap-1.5">

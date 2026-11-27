@@ -13,8 +13,10 @@ import {
   duplicateQuestion,
   moveQuestion,
   saveQuestion,
+  setVersions,
   updateAssessment,
 } from "@/services/assessments";
+import { VERSION_LETTERS } from "@/lib/versions/versions";
 import { Card, PageHeader } from "@/components/ui/PageHeader";
 import { ActionForm } from "@/components/ui/ActionForm";
 import { ConfirmButton } from "@/components/ui/ConfirmButton";
@@ -93,6 +95,43 @@ export default async function AvaliacaoPage({ params }: { params: Promise<{ id: 
                   <HeaderFields classes={classes ?? []} value={{ ...row, max_score: Number(row.max_score) }} logoUrl={logoUrl} />
                 </ActionForm>
               </div>
+            </details>
+          </Card>
+          {/* Versões A–D com as questões em ordem diferente */}
+          <Card className="mb-6 p-5">
+            <details open={(assessment.versions ?? 1) > 1}>
+              <summary className="cursor-pointer font-bold text-brand-900">
+                Versões da prova {(assessment.versions ?? 1) > 1 ? `· ${VERSION_LETTERS.slice(0, assessment.versions).join(", ")}` : "· versão única"}
+              </summary>
+              <p className="mt-2 text-[13px] text-muted">
+                Mesma prova com as questões em ordem diferente, para evitar cola. Cada aluno recebe a prova e o cartão da sua versão pela ordem de chamada
+                (1º A, 2º B, 3º C…). As questões só trocam de lugar dentro da mesma disciplina e do mesmo tipo, e a correção pela câmera já sabe a versão de
+                cada cartão. Depois de mudar, imprima as provas e os cartões de novo.
+              </p>
+              <ActionForm action={setVersions.bind(null, id)} submitLabel="Salvar versões" className="mt-3">
+                <div className="flex flex-wrap gap-2">
+                  {[1, 2, 3, 4].map((n) => (
+                    <label key={n} className="flex cursor-pointer items-center gap-2 rounded-xl border border-line px-3 py-2 has-checked:border-brand-500 has-checked:bg-brand-50/60">
+                      <input type="radio" name="versions" value={n} defaultChecked={(assessment.versions ?? 1) === n} className="accent-brand-700" />
+                      <span className="text-[14px] font-semibold text-brand-900">{n === 1 ? "Só uma" : `${n} versões`}</span>
+                    </label>
+                  ))}
+                </div>
+              </ActionForm>
+              {(assessment.versions ?? 1) > 1 && (
+                <div className="mt-4 flex flex-wrap gap-2 text-[13px]">
+                  {VERSION_LETTERS.slice(0, assessment.versions).map((l) => (
+                    <span key={l} className="inline-flex overflow-hidden rounded-lg border border-line">
+                      <a href={`/api/avaliacoes/${id}/pdf?modo=branco&versao=${l}`} target="_blank" rel="noopener" className="px-2.5 py-1.5 font-bold text-brand-900 hover:bg-brand-50">
+                        Versão {l} · PDF
+                      </a>
+                      <a href={`/api/avaliacoes/${id}/docx?versao=${l}`} className="border-l border-line px-2.5 py-1.5 font-bold text-brand-700 hover:bg-brand-50">
+                        Word
+                      </a>
+                    </span>
+                  ))}
+                </div>
+              )}
             </details>
           </Card>
           {/* Mesma prova em outras turmas: cada turma ganha a sua cópia (cartões e notas separados) */}
