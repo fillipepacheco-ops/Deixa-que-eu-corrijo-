@@ -7,6 +7,7 @@ import { LogOut, Menu, X } from "lucide-react";
 import { Logo } from "@/components/brand/Logo";
 import { signOut } from "@/services/auth";
 import { NAV, type NavItem } from "./nav";
+import { SchoolSwitcher } from "./SchoolSwitcher";
 
 function NavLink({ item, active, onClick }: { item: NavItem; active: boolean; onClick?: () => void }) {
   const Icon = item.icon;
@@ -36,18 +37,33 @@ function NavLink({ item, active, onClick }: { item: NavItem; active: boolean; on
   );
 }
 
-export function AppShell({ teacherName, children }: { teacherName: string; children: React.ReactNode }) {
+export function AppShell({
+  teacherName,
+  schools = [],
+  currentSchool = "",
+  extraNav = [],
+  children,
+}: {
+  teacherName: string;
+  schools?: { id: string; name: string }[];
+  currentSchool?: string;
+  extraNav?: NavItem[];
+  children: React.ReactNode;
+}) {
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
   const isActive = (href: string) => pathname === href || pathname.startsWith(`${href}/`);
 
   const sidebar = (
     <div className="flex h-full flex-col bg-brand-900 px-3 py-5">
-      <div className="px-2 pb-6">
+      <div className="px-2 pb-4">
         <Logo onDark height={42} />
       </div>
+      <div className="mb-4 px-1">
+        <SchoolSwitcher schools={schools} current={currentSchool} dark />
+      </div>
       <nav className="flex-1 space-y-0.5 overflow-y-auto">
-        {NAV.map((item) => (
+        {[...NAV, ...extraNav].map((item) => (
           <NavLink key={item.href} item={item} active={isActive(item.href)} onClick={() => setOpen(false)} />
         ))}
       </nav>
@@ -70,6 +86,9 @@ export function AppShell({ teacherName, children }: { teacherName: string; child
       {/* Celular/tablet: topo + gaveta */}
       <header className="sticky top-0 z-30 flex items-center justify-between border-b border-line bg-white/90 px-4 py-3 backdrop-blur lg:hidden">
         <Logo height={34} />
+        <div className="ml-auto mr-2 max-w-[45%]">
+          <SchoolSwitcher schools={schools} current={currentSchool} />
+        </div>
         <button onClick={() => setOpen(true)} aria-label="Abrir menu" className="rounded-lg p-2 text-brand-900 hover:bg-brand-50">
           <Menu size={22} />
         </button>

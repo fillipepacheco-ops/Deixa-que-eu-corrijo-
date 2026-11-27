@@ -10,7 +10,15 @@ import { toJpeg } from "@/components/upload/resize";
  * Logo da escola: o arquivo vai direto para o Storage do professor
  * (pasta com o id dele) e o caminho segue no formulário.
  */
-export function LogoUpload({ initialPath, initialUrl }: { initialPath?: string | null; initialUrl?: string | null }) {
+export function LogoUpload({
+  initialPath,
+  initialUrl,
+  name = "school_logo_path",
+}: {
+  initialPath?: string | null;
+  initialUrl?: string | null;
+  name?: string;
+}) {
   const [path, setPath] = useState(initialPath ?? "");
   const [preview, setPreview] = useState(initialUrl ?? "");
   const [busy, setBusy] = useState(false);
@@ -43,7 +51,7 @@ export function LogoUpload({ initialPath, initialUrl }: { initialPath?: string |
 
   return (
     <div>
-      <input type="hidden" name="school_logo_path" value={path} />
+      <input type="hidden" name={name} value={path} />
       <div className="flex items-center gap-3">
         <button
           type="button"

@@ -3,6 +3,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ArrowLeft, Pencil, Trash2 } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
+import { loadSchools } from "@/services/school-context";
 import { deleteClass, updateClass } from "@/services/classes";
 import { addStudent, addStudentsBulk, removeStudent, updateStudent } from "@/services/students";
 import { Card, EmptyState, PageHeader } from "@/components/ui/PageHeader";
@@ -118,7 +119,7 @@ export default async function TurmaPage({ params }: { params: Promise<{ id: stri
               <summary className="cursor-pointer font-bold text-brand-900">Editar dados da turma</summary>
               <div className="mt-4">
                 <ActionForm action={updateClass.bind(null, id)} submitLabel="Salvar turma" successText="Turma atualizada.">
-                  <ClassFields value={turma} compact />
+                  <ClassFields value={turma} compact schools={await loadSchools(supabase)} />
                 </ActionForm>
               </div>
             </details>

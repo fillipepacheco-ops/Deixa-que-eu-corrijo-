@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { ChevronRight, ScanLine } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
+import { classIdsOfCurrent } from "@/services/school-context";
 import { Card, EmptyState, PageHeader } from "@/components/ui/PageHeader";
 import { buttonClass } from "@/components/ui/button";
 import { formatDateBR } from "@/lib/assessment/header";
@@ -18,7 +19,10 @@ export default async function CorrecaoPage({ searchParams }: { searchParams: Pro
     .select("*, classes(name, students(count)), submissions(count)")
     .order("applied_on", { ascending: false, nullsFirst: false })
     .order("created_at", { ascending: false });
-  const items = (data ?? []) as ({ id: string; title: string; applied_on: string | null; created_at: string; term?: number | null } & Record<string, unknown>)[];
+  const only = await classIdsOfCurrent(supabase);
+  const items = ((data ?? []) as ({ id: string; title: string; applied_on: string | null; created_at: string; term?: number | null } & Record<string, unknown>)[]).filter(
+    (a) => !only || only.includes(a.class_id as string),
+  );
   const groups = groupByTerm(items);
   const { current, shown } = visibleGroups(groups, bim);
 

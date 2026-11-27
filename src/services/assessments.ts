@@ -46,11 +46,19 @@ async function rememberSchool(data: { school_name: string | null; school_logo_pa
 }
 
 async function fillFromClass(data: ReturnType<typeof readHeader>) {
-  if (!data.class_id || (data.subject && data.grade_level)) return;
+  if (!data.class_id) return;
   const supabase = await createClient();
-  const { data: turma } = await supabase.from("classes").select("subject, grade_level").eq("id", data.class_id).maybeSingle();
+  const { data: turma } = await supabase.from("classes").select("subject, grade_level, school_id").eq("id", data.class_id).maybeSingle();
   data.subject ??= turma?.subject ?? null;
   data.grade_level ??= turma?.grade_level ?? null;
+  // a escola da turma manda no nome e na logo da prova
+  if (turma?.school_id) {
+    const { data: escola } = await supabase.from("schools").select("*").eq("id", turma.school_id).maybeSingle();
+    if (escola) {
+      data.school_name = escola.name as string;
+      if (escola.logo_path) data.school_logo_path = escola.logo_path as string;
+    }
+  }
 }
 
 function readImported(formData: FormData, userId: string) {

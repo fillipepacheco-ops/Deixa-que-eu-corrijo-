@@ -15,6 +15,7 @@ function readClass(formData: FormData) {
     year: Number.isFinite(year) ? year : new Date().getFullYear(),
     shift: String(formData.get("shift") ?? "").trim() || null,
     subject: String(formData.get("subject") ?? "").trim() || null,
+    school_id: String(formData.get("school_id") ?? "").trim() || null,
   };
 }
 

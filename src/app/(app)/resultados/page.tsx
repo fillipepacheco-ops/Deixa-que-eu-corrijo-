@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { BarChart3, ChevronRight, School, Sigma } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
+import { classIdsOfCurrent } from "@/services/school-context";
 import { Card, EmptyState, PageHeader } from "@/components/ui/PageHeader";
 import { buttonClass } from "@/components/ui/button";
 import { formatDateBR } from "@/lib/assessment/header";
@@ -32,7 +33,8 @@ export default async function ResultadosPage({ searchParams }: { searchParams: P
     .select("*, classes(name, students(count)), submissions(score)")
     .order("applied_on", { ascending: false, nullsFirst: false })
     .order("created_at", { ascending: false });
-  const all = (data ?? []) as unknown as Item[];
+  const only = await classIdsOfCurrent(supabase);
+  const all = ((data ?? []) as unknown as Item[]).filter((a) => !only || (a.class_id && only.includes(a.class_id)));
   // filtro por bimestre
   const termGroups = groupByTerm(all);
   const { current, shown } = visibleGroups(termGroups, bim);
