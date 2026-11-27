@@ -252,3 +252,49 @@ export async function appendImportedQuestions(assessmentId: string, imported: un
   revalidatePath(`/avaliacoes/${assessmentId}`);
   return { ok: true };
 }
+
+/**
+ * Aplica a mesma prova em outras turmas: cria uma cópia por turma (questões,
+ * gabarito, imagens e cabeçalho), sem mexer na avaliação original nem nas notas dela.
+ */
+export async function applyToClasses(assessmentId: string, _: FormState, formData: FormData): Promise<FormState> {
+  const classIds = formData.getAll("class_ids").map(String).filter(Boolean);
+  if (!classIds.length) return { error: "Marque pelo menos uma turma." };
+  const supabase = await createClient();
+  const { data: original } = await supabase.from("assessments").select("*").eq("id", assessmentId).maybeSingle();
+  if (!original) return { error: "Avaliação não encontrada." };
+  const { data: questions } = await supabase
+    .from("assessment_questions")
+    .select("*")
+    .eq("assessment_id", assessmentId)
+    .order("position");
+  const { data: classes } = await supabase.from("classes").select("id, name, subject, grade_level").in("id", classIds);
+  if (!classes?.length) return { error: "Turmas não encontradas." };
+
+  const skip = new Set(["id", "created_at", "updated_at", "owner_id"]);
+  const copyRow = (r: Record<string, unknown>) => Object.fromEntries(Object.entries(r).filter(([k]) => !skip.has(k)));
+  const created: string[] = [];
+  for (const turma of classes) {
+    const { data: row, error } = await supabase
+      .from("assessments")
+      .insert({
+        ...copyRow(original),
+        class_id: turma.id,
+        subject: original.subject ?? turma.subject,
+        grade_level: original.grade_level ?? turma.grade_level,
+        status: "draft",
+      })
+      .select("id")
+      .single();
+    if (error || !row) return { error: `Não foi possível copiar para ${turma.name}. (${error?.message ?? "erro"})` };
+    if (questions?.length) {
+      const { error: qErr } = await supabase
+        .from("assessment_questions")
+        .insert(questions.map((q) => ({ ...copyRow(q), assessment_id: row.id, question_id: q.question_id ?? null })));
+      if (qErr) return { error: `A cópia para ${turma.name} foi criada, mas as questões não. (${qErr.message})` };
+    }
+    created.push(turma.name as string);
+  }
+  revalidatePath("/avaliacoes");
+  return { ok: true, message: `Prova aplicada em: ${created.join(", ")}. Cada turma tem a sua cópia, com cartões e notas separados.` };
+}

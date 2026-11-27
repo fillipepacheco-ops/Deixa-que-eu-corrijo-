@@ -7,6 +7,7 @@ import { createClient } from "@/lib/supabase/server";
 import { loadAssessment, loadStudents, questionImageUrls, schoolLogoUrl } from "@/services/assessment-data";
 import {
   addQuestion,
+  applyToClasses,
   deleteAssessment,
   deleteQuestion,
   duplicateQuestion,
@@ -94,6 +95,30 @@ export default async function AvaliacaoPage({ params }: { params: Promise<{ id: 
               </div>
             </details>
           </Card>
+          {/* Mesma prova em outras turmas: cada turma ganha a sua cópia (cartões e notas separados) */}
+          {(classes ?? []).some((c) => c.id !== row.class_id) && (
+            <Card className="mb-6 p-5">
+              <details>
+                <summary className="cursor-pointer font-bold text-brand-900">Aplicar esta prova em outras turmas</summary>
+                <p className="mt-2 text-[13px] text-muted">
+                  Cria uma cópia desta avaliação para cada turma marcada, com as mesmas questões, gabarito e cabeçalho. Esta avaliação e as notas
+                  dela continuam como estão.
+                </p>
+                <ActionForm action={applyToClasses.bind(null, id)} submitLabel="Aplicar nas turmas marcadas" resetOnSuccess className="mt-3">
+                  <div className="grid gap-2 sm:grid-cols-2">
+                    {(classes ?? [])
+                      .filter((c) => c.id !== row.class_id)
+                      .map((c) => (
+                        <label key={c.id} className="flex cursor-pointer items-center gap-3 rounded-xl border border-line px-3 py-2.5 has-checked:border-brand-500 has-checked:bg-brand-50/60">
+                          <input type="checkbox" name="class_ids" value={c.id} className="h-5 w-5 accent-brand-700" />
+                          <span className="font-semibold text-brand-900">{c.name}</span>
+                        </label>
+                      ))}
+                  </div>
+                </ActionForm>
+              </details>
+            </Card>
+          )}
           <h2 className="mb-3 text-[15px] font-bold text-brand-900">Questões</h2>
           <div className="space-y-3">
             {questions.map((q, i) => (
