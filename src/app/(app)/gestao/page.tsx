@@ -1,10 +1,10 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { Search, Trash2 } from "lucide-react";
+import { Search, Trash2, Undo2 } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { loadAccess } from "@/services/access";
-import { adminChangePlan, adminDeleteUser, adminSubscription } from "@/services/billing";
+import { adminChangePlan, adminDeleteUser, adminSetPaidUntil, adminSubscription } from "@/services/billing";
 import { Card, EmptyState, PageHeader } from "@/components/ui/PageHeader";
 import { ConfirmButton } from "@/components/ui/ConfirmButton";
 import { buttonClass } from "@/components/ui/button";
@@ -53,7 +53,13 @@ export default async function GestaoPage({ searchParams }: { searchParams: Promi
   if (!access.isAdmin) notFound(); // só a conta do gestor
 
   const { f = "todos", q = "" } = await searchParams;
-  const { data, error } = await supabase.from("subscriptions").select("*").order("created_at", { ascending: false });
+  const [{ data, error }, { data: changes }] = await Promise.all([
+    supabase.from("subscriptions").select("*").order("created_at", { ascending: false }),
+    supabase.from("subscription_changes").select("user_id, action, at").eq("undone", false).order("at", { ascending: false }),
+  ]);
+  const lastChange = new Map<string, { action: string; at: string }>();
+  for (const c of changes ?? []) if (!lastChange.has(c.user_id)) lastChange.set(c.user_id, c);
+  const ACTION_NAME: Record<string, string> = { pagou: "+30 dias", suspender: "suspensão", reativar: "reativação", plano: "troca de plano", data: "mudança de vencimento" };
   const today = todayISO();
   const rows = ((data ?? []) as Subscription[])
     .filter((s) => s.user_id !== user.id)
@@ -143,6 +149,19 @@ export default async function GestaoPage({ searchParams }: { searchParams: Promi
                     {left !== null && left < 0 && r.paid_until && ` (bloqueio em ${brDate(blockDate(r.paid_until))})`}
                   </span>
                 </div>
+                <details className="mt-2">
+                  <summary className="cursor-pointer text-[13px] font-bold text-brand-700">Mudar o vencimento</summary>
+                  <form action={adminSetPaidUntil.bind(null, r.user_id)} className="mt-2 flex flex-wrap items-center gap-2">
+                    <input type="date" name="paid_until" defaultValue={r.paid_until ?? ""} className="field w-auto! py-1.5!" required />
+                    <button className={buttonClass("secondary")}>Salvar data</button>
+                  </form>
+                </details>
+                {lastChange.get(r.user_id) && (
+                  <p className="mt-1 text-[12px] text-muted">
+                    Último lançamento: {ACTION_NAME[lastChange.get(r.user_id)!.action] ?? lastChange.get(r.user_id)!.action} em{" "}
+                    {new Date(lastChange.get(r.user_id)!.at).toLocaleString("pt-BR", { dateStyle: "short", timeStyle: "short", timeZone: "America/Sao_Paulo" })}
+                  </p>
+                )}
                 <div className="mt-3 flex flex-wrap gap-2">
                   <form action={adminSubscription.bind(null, r.user_id, "pagou", undefined)}>
                     <button className={buttonClass("primary")}>Confirmar pagamento (+30 dias)</button>
@@ -160,6 +179,17 @@ export default async function GestaoPage({ searchParams }: { searchParams: Promi
                       Suspender
                     </ConfirmButton>
                   )}
+                  <ConfirmButton
+                    variant="secondary"
+                    action={adminSubscription.bind(null, r.user_id, "desfazer", undefined)}
+                    message={
+                      lastChange.get(r.user_id)
+                        ? `Desfazer o último lançamento de ${r.full_name || r.email} (${ACTION_NAME[lastChange.get(r.user_id)!.action] ?? lastChange.get(r.user_id)!.action})? Volta exatamente como estava antes.`
+                        : `Desfazer um "+30 dias" de ${r.full_name || r.email}? O vencimento volta 30 dias (${brDate(r.paid_until)} → 30 dias antes).`
+                    }
+                  >
+                    <Undo2 size={15} /> Desfazer
+                  </ConfirmButton>
                   <ConfirmButton
                     action={adminDeleteUser.bind(null, r.user_id)}
                     message={`Apagar a conta de ${r.full_name || r.email}? Turmas, provas e notas dessa pessoa serão apagadas para sempre.`}

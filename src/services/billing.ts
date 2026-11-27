@@ -14,7 +14,7 @@ export async function choosePlan(plan: string) {
   redirect("/assinatura");
 }
 
-const ACTIONS = ["pagou", "suspender", "reativar", "plano"] as const;
+const ACTIONS = ["pagou", "suspender", "reativar", "plano", "desfazer"] as const;
 
 /** Aba Gestão: confirmar pagamento, suspender, reativar, trocar plano. O banco confere se é o gestor. */
 export async function adminSubscription(userId: string, action: string, plan?: string) {
@@ -25,6 +25,16 @@ export async function adminSubscription(userId: string, action: string, plan?: s
     p_action: action,
     p_plan: plan && isPlan(plan) ? plan : null,
   });
+  if (error) throw new Error(error.message);
+  revalidatePath("/gestao");
+}
+
+/** Aba Gestão: mudar a data de vencimento à mão. */
+export async function adminSetPaidUntil(userId: string, formData: FormData) {
+  const date = String(formData.get("paid_until") ?? "");
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return;
+  const supabase = await createClient();
+  const { error } = await supabase.rpc("admin_set_paid_until", { p_user: userId, p_date: date });
   if (error) throw new Error(error.message);
   revalidatePath("/gestao");
 }
