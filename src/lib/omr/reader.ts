@@ -36,6 +36,9 @@ export interface ReadResult {
   error?: string;
   sheetNumber: number | null;
   rollNumber: number | null;
+  /** Versão pintada pelo aluno (0 = A); null = nenhuma, mais de uma ou duvidosa (ver versionMark). */
+  examVersion?: number | null;
+  versionMark?: "none" | "ok" | "multiple" | "uncertain" | "n/a";
   answers: Record<number, string | null>;
   questions: QuestionRead[];
   problems: string[];
@@ -203,14 +206,14 @@ function meanGrayDisc(img: GrayImage, h: Homography, cx: number, cy: number, r: 
   return sum / n;
 }
 
-export function readAnswerSheet(img: GrayImage, questions: SheetQuestionSpec[]): ReadResult {
+export function readAnswerSheet(img: GrayImage, questions: SheetQuestionSpec[], opts: { versions?: number } = {}): ReadResult {
   const empty: ReadResult = { ok: false, sheetNumber: null, rollNumber: null, answers: {}, questions: [], problems: [] };
   const corners = findFiducials(img);
   if (!corners) {
     return { ...empty, error: "Não encontrei os 4 quadrados pretos dos cantos. Enquadre o cartão inteiro, com boa luz." };
   }
 
-  const layout = sheetLayout(questions);
+  const layout = sheetLayout(questions, opts);
   const H = computeHomography(FIDUCIALS.map((f) => ({ x: f.x, y: f.y })), corners);
 
   // Calibração: preto impresso (guias do código) e branco do papel.
@@ -246,6 +249,20 @@ export function readAnswerSheet(img: GrayImage, questions: SheetQuestionSpec[]):
   });
   if (digits[0] !== null && digits[1] !== null) rollNumber = digits[0] * 10 + digits[1];
 
+  // Versão da prova pintada pelo aluno.
+  let examVersion: number | null = null;
+  let versionMark: ReadResult["versionMark"] = "n/a";
+  if (layout.versionBubbles.length) {
+    const vf = layout.versionBubbles.map((b) => ({ v: b.version, f: fill(meanGrayDisc(img, H, b.x, b.y, b.r * 0.6)) }));
+    const marked = vf.filter((b) => b.f >= MARKED_MIN);
+    const doubtful = vf.filter((b) => b.f > EMPTY_MAX && b.f < MARKED_MIN);
+    if (doubtful.length) versionMark = "uncertain";
+    else if (marked.length === 1) {
+      versionMark = "ok";
+      examVersion = marked[0].v;
+    } else versionMark = marked.length ? "multiple" : "none";
+  }
+
   // Bolhas.
   const reads: QuestionRead[] = [];
   const answers: Record<number, string | null> = {};
@@ -276,5 +293,5 @@ export function readAnswerSheet(img: GrayImage, questions: SheetQuestionSpec[]):
     reads.push({ number: q.number, answer, fills, confidence: Math.round(confidence * 100) / 100 });
   }
 
-  return { ok: true, sheetNumber, rollNumber, answers, questions: reads, problems, corners, homography: H };
+  return { ok: true, sheetNumber, rollNumber, examVersion, versionMark, answers, questions: reads, problems, corners, homography: H };
 }

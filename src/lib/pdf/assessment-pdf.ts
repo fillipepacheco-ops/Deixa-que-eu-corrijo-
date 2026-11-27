@@ -481,6 +481,8 @@ export async function generateAssessmentPdf(input: AssessmentPdfInput): Promise<
       drawTextTop(p, max, { x: gx + gradeW - regular.widthOfTextAtSize(max, 7) - 4, top: startTop + gh - 11, size: 7, font: regular, color: BRAND.gray });
     }
 
+    if (versionLetter) top = drawVersionBanner(p, top + mm(3));
+
     if (cfg.showSignature) {
       top += mm(7);
       const sw = mm(80);
@@ -507,6 +509,23 @@ export async function generateAssessmentPdf(input: AssessmentPdfInput): Promise<
   }
 
   /** Capa: mesmos dados do cartão-resposta + instruções numeradas. */
+  /** Faixa "VERSÃO DA PROVA: B" (provas com versões, inclusive cópias xerox sem nome). */
+  const versionLetter = assessment.version !== null && assessment.version !== undefined && (assessment.versions ?? 1) > 1 ? "ABCD"[assessment.version] : null;
+  function drawVersionBanner(p: PDFPage, top: number): number {
+    if (!versionLetter) return top;
+    const h = mm(15);
+    p.drawRectangle({ x: MARGIN_X, y: A4.h - top - h, width: contentW, height: h, color: BRAND.dark });
+    const box = mm(11);
+    p.drawRectangle({ x: MARGIN_X + mm(2), y: A4.h - top - mm(2) - box, width: box, height: box, color: BRAND.white });
+    const lw = bold.widthOfTextAtSize(versionLetter, 22);
+    drawTextTop(p, versionLetter, { x: MARGIN_X + mm(2) + (box - lw) / 2, top: top + mm(2) + mm(2.2), size: 22, font: bold, color: BRAND.dark });
+    drawTextTop(p, `VERSÃO DA PROVA: ${versionLetter}`, { x: MARGIN_X + mm(16), top: top + mm(2.6), size: 12, font: bold, color: BRAND.white });
+    drawTextTop(p, `Pinte a letra ${versionLetter} no campo VERSÃO DA PROVA do seu cartão-resposta. Sem isso, a correção pode sair errada.`, {
+      x: MARGIN_X + mm(16), top: top + mm(8.6), size: 8, font: regular, color: BRAND.white,
+    });
+    return top + h + mm(3);
+  }
+
   function drawCover(p: PDFPage) {
     const h = examHeader(assessment);
     let top = MARGIN_TOP + mm(2);
@@ -553,7 +572,8 @@ export async function generateAssessmentPdf(input: AssessmentPdfInput): Promise<
     field("Professor(a)", h.teacherName, MARGIN_X + half, half);
     top += rowH;
     field("Assinatura do(a) estudante", "", MARGIN_X, contentW);
-    top += rowH + mm(9);
+    top += rowH + mm(4);
+    top = versionLetter ? drawVersionBanner(p, top) + mm(2) : top + mm(5);
 
     p.drawRectangle({ x: MARGIN_X, y: A4.h - top - 18, width: contentW, height: 18, color: BRAND.light });
     drawTextTop(p, "INSTRUÇÕES", { x: MARGIN_X + 5, top: top + 4, size: 12, font: bold, color: BRAND.dark });

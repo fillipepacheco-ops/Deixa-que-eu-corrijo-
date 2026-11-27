@@ -16,6 +16,9 @@ export interface RenderOptions {
   /** marcações fracas (meio apagadas): mesmo formato */
   faintMarks?: Record<number, string>;
   roll?: number;
+  /** versões da prova no cartão e a que o aluno pintou (0 = A) */
+  versions?: number;
+  version?: number | number[];
   width?: number;
   height?: number;
   /** Onde os cantos da FOLHA (0,0)-(210,297) aparecem na foto, em px. */
@@ -34,7 +37,7 @@ export function renderSheetPhoto(o: RenderOptions): GrayImage {
   ];
   const pageMm = [{ x: 0, y: 0 }, { x: PAGE_W, y: 0 }, { x: PAGE_W, y: PAGE_H }, { x: 0, y: PAGE_H }];
   const toMm = computeHomography(corners, pageMm); // pixel → mm
-  const layout = sheetLayout(o.questions);
+  const layout = sheetLayout(o.questions, { versions: o.versions });
   const bits = encodeSheetNumber(o.sheetNumber);
   const paper = o.paper ?? 225;
   const ink = o.ink ?? 45;
@@ -45,6 +48,7 @@ export function renderSheetPhoto(o: RenderOptions): GrayImage {
   const marked = new Set<string>();
   for (const [q, v] of Object.entries(o.marks)) for (const l of [v].flat()) marked.add(`${q}:${l}`);
   const faint = new Set<string>(Object.entries(o.faintMarks ?? {}).map(([q, l]) => `${q}:${l}`));
+  for (const v of o.version === undefined ? [] : [o.version].flat()) marked.add(`ver:${v}`);
   if (o.roll !== undefined) {
     marked.add(`roll0:${Math.floor(o.roll / 10)}`);
     marked.add(`roll1:${o.roll % 10}`);
@@ -58,6 +62,7 @@ export function renderSheetPhoto(o: RenderOptions): GrayImage {
   const circles = [
     ...layout.bubbles.map((b) => ({ x: b.x, y: b.y, r: b.r, key: `${b.question}:${b.label}` })),
     ...layout.rollBubbles.map((b) => ({ x: b.x, y: b.y, r: b.r, key: `roll${b.digit}:${b.value}` })),
+    ...layout.versionBubbles.map((b) => ({ x: b.x, y: b.y, r: b.r, key: `ver:${b.version}` })),
   ];
 
   const data = new Uint8Array(W * H);

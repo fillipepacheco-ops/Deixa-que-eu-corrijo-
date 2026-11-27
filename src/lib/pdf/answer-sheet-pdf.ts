@@ -5,7 +5,7 @@
  */
 import { PDFDocument, StandardFonts, rgb, type PDFPage } from "pdf-lib";
 import { encodeSheetNumber } from "@/lib/answer-sheet/code";
-import { FIDUCIAL_SIZE, sheetLayout, type SheetQuestionSpec } from "@/lib/answer-sheet/layout";
+import { FIDUCIAL_SIZE, VERSION_BOX, sheetLayout, type SheetQuestionSpec } from "@/lib/answer-sheet/layout";
 import { A4, BRAND, drawBrandMark, drawTextTop, formatDateBR, mm, sanitize } from "./common";
 
 export interface AnswerSheetCard {
@@ -26,6 +26,8 @@ export interface AnswerSheetInput {
   logoPng?: Uint8Array | null;
   /** Logo da escola (a mesma da capa da prova), JPEG ou PNG — vai no canto superior direito. */
   schoolLogo?: Uint8Array | null;
+  /** Prova com versões (2–4): o cartão ganha o campo VERSÃO DA PROVA para o aluno pintar. */
+  versions?: number;
 }
 
 const toX = (xMm: number) => mm(xMm);
@@ -35,7 +37,7 @@ export async function generateAnswerSheetsPdf(input: AnswerSheetInput): Promise<
   if (input.cards.length === 0) throw new Error("Nenhum cartão para gerar.");
   if (input.questions.length === 0) throw new Error("A avaliação não tem questões objetivas para o cartão-resposta.");
 
-  const layout = sheetLayout(input.questions);
+  const layout = sheetLayout(input.questions, { versions: input.versions });
   const doc = await PDFDocument.create();
   doc.setTitle(`Cartão-resposta — ${input.assessmentTitle}`);
   doc.setCreator("Deixa que eu Corrijo");
@@ -144,14 +146,35 @@ export async function generateAnswerSheetsPdf(input: AnswerSheetInput): Promise<
     }
 
     // Instruções de preenchimento.
-    page.drawRectangle({ x: mm(14), y: toY(98), width: mm(136), height: mm(14), color: BRAND.light });
-    drawTextTop(page, "Preencha toda a bolha com caneta preta ou azul-escura.", { x: mm(17), top: mm(86.5), size: 8, font: bold, color: BRAND.dark });
-    drawTextTop(page, "Não rasure, não dobre e não escreva sobre os quadrados pretos. Uma marcação por questão.", {
-      x: mm(17), top: mm(91.5), size: 7, font: regular, color: BRAND.ink,
-    });
-    // Exemplo de marcação correta.
-    page.drawCircle({ x: mm(146), y: toY(91), size: mm(1.65), color: BRAND.black });
-    drawTextTop(page, "certo", { x: mm(138.5), top: mm(94.5), size: 6, font: regular, color: BRAND.gray });
+    if (layout.versionBubbles.length) {
+      // instruções mais estreitas + campo VERSÃO DA PROVA ao lado
+      page.drawRectangle({ x: mm(14), y: toY(98), width: mm(99), height: mm(14), color: BRAND.light });
+      drawTextTop(page, "Preencha toda a bolha com caneta preta ou azul-escura.", { x: mm(17), top: mm(85.6), size: 7.5, font: bold, color: BRAND.dark });
+      drawTextTop(page, "Não rasure, não dobre e não escreva nos quadrados pretos.", { x: mm(17), top: mm(89.8), size: 6.5, font: regular, color: BRAND.ink });
+      drawTextTop(page, "Uma marcação por questão. Pinte a VERSÃO DA PROVA ao lado.", { x: mm(17), top: mm(93.4), size: 6.5, font: bold, color: BRAND.ink });
+      page.drawCircle({ x: mm(108.5), y: toY(90.5), size: mm(1.65), color: BRAND.black });
+      drawTextTop(page, "certo", { x: mm(105.4), top: mm(93.6), size: 5.5, font: regular, color: BRAND.gray });
+
+      const vb = VERSION_BOX;
+      page.drawRectangle({ x: mm(vb.x), y: toY(vb.y + vb.h), width: mm(vb.w), height: mm(vb.h), borderColor: BRAND.dark, borderWidth: 1 });
+      page.drawRectangle({ x: mm(vb.x), y: toY(vb.y + 4.2), width: mm(vb.w), height: mm(4.2), color: BRAND.dark });
+      const t = "VERSÃO DA PROVA";
+      drawTextTop(page, t, { x: mm(vb.x + vb.w / 2) - bold.widthOfTextAtSize(t, 6.5) / 2, top: mm(vb.y + 0.9), size: 6.5, font: bold, color: BRAND.white });
+      for (const b of layout.versionBubbles) {
+        page.drawCircle({ x: toX(b.x), y: toY(b.y), size: mm(b.r), borderColor: BRAND.ink, borderWidth: 0.9 });
+        const w = bold.widthOfTextAtSize(b.label, 6.5);
+        drawTextTop(page, b.label, { x: toX(b.x) - w / 2, top: mm(b.y) - 2.6, size: 6.5, font: bold, color: rgb(0.62, 0.65, 0.64) });
+      }
+    } else {
+      page.drawRectangle({ x: mm(14), y: toY(98), width: mm(136), height: mm(14), color: BRAND.light });
+      drawTextTop(page, "Preencha toda a bolha com caneta preta ou azul-escura.", { x: mm(17), top: mm(86.5), size: 8, font: bold, color: BRAND.dark });
+      drawTextTop(page, "Não rasure, não dobre e não escreva sobre os quadrados pretos. Uma marcação por questão.", {
+        x: mm(17), top: mm(91.5), size: 7, font: regular, color: BRAND.ink,
+      });
+      // Exemplo de marcação correta.
+      page.drawCircle({ x: mm(146), y: toY(91), size: mm(1.65), color: BRAND.black });
+      drawTextTop(page, "certo", { x: mm(138.5), top: mm(94.5), size: 6, font: regular, color: BRAND.gray });
+    }
 
     // Grade de respostas.
     for (const h of layout.columnHeaders) {

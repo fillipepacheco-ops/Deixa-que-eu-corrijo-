@@ -81,6 +81,22 @@ export interface RollBubble {
   r: number;
 }
 
+/** Bolhas da VERSÃO DA PROVA (A–D) — o aluno pinta a versão que recebeu (cópias sem nome). */
+export interface VersionBubble {
+  version: number; // 0 = A
+  label: string;
+  x: number;
+  y: number;
+  r: number;
+}
+
+export const VERSION_BOX = { x: 116, y: 84, w: 34, h: 14 };
+export function versionGridLayout(versions: number): VersionBubble[] {
+  const n = Math.max(0, Math.min(4, Math.floor(versions)));
+  if (n < 2) return [];
+  return Array.from({ length: n }, (_, i) => ({ version: i, label: "ABCD"[i], x: 122 + i * 7, y: 93.3, r: 1.9 }));
+}
+
 export interface SheetLayout {
   version: number;
   fiducials: typeof FIDUCIALS;
@@ -88,6 +104,8 @@ export interface SheetLayout {
   /** Células-guia sempre preenchidas nas pontas da faixa de código. */
   codeGuards: { x: number; y: number; size: number }[];
   rollBubbles: RollBubble[];
+  /** Vazio quando a prova tem uma versão só. */
+  versionBubbles: VersionBubble[];
   bubbles: Bubble[];
   questionLabels: { number: number; x: number; y: number }[];
   columnHeaders: { label: string; x: number; y: number }[];
@@ -128,7 +146,7 @@ export function rollGridLayout(): RollBubble[] {
   return out;
 }
 
-export function sheetLayout(questions: SheetQuestionSpec[]): SheetLayout {
+export function sheetLayout(questions: SheetQuestionSpec[], opts: { versions?: number } = {}): SheetLayout {
   const units = questions.reduce((n, q) => n + (q.numeric ? NUMERIC_ROWS : 1), 0);
   if (questions.length > MAX_QUESTIONS || units > MAX_QUESTIONS) {
     throw new Error(
@@ -194,6 +212,7 @@ export function sheetLayout(questions: SheetQuestionSpec[]): SheetLayout {
     codeCells: cells,
     codeGuards: guards,
     rollBubbles: rollGridLayout(),
+    versionBubbles: versionGridLayout(opts.versions ?? 1),
     bubbles,
     questionLabels,
     columnHeaders,

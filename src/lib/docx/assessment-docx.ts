@@ -166,6 +166,21 @@ function coverPage(h: ExamHeader, opts: DocxOptions): (Paragraph | Table)[] {
       rows: [row([["Assinatura do(a) estudante", "", CONTENT_W]])],
     }),
   );
+  if (h.versionLetter) {
+    out.push(
+      new Paragraph({
+        spacing: { before: 240, after: 0 },
+        shading: { type: ShadingType.CLEAR, color: "auto", fill: DARK },
+        children: [new TextRun({ text: ` VERSÃO DA PROVA: ${h.versionLetter} `, bold: true, size: 32, color: "FFFFFF", font: FONT })],
+      }),
+      new Paragraph({
+        shading: { type: ShadingType.CLEAR, color: "auto", fill: DARK },
+        children: [
+          new TextRun({ text: ` Pinte a letra ${h.versionLetter} no campo VERSÃO DA PROVA do seu cartão-resposta. `, size: 18, color: "FFFFFF", font: FONT }),
+        ],
+      }),
+    );
+  }
 
   out.push(
     new Paragraph({

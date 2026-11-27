@@ -104,9 +104,10 @@ export default async function AvaliacaoPage({ params }: { params: Promise<{ id: 
                 Versões da prova {(assessment.versions ?? 1) > 1 ? `· ${VERSION_LETTERS.slice(0, assessment.versions).join(", ")}` : "· versão única"}
               </summary>
               <p className="mt-2 text-[13px] text-muted">
-                Mesma prova com as questões em ordem diferente, para evitar cola. Cada aluno recebe a prova e o cartão da sua versão pela ordem de chamada
-                (1º A, 2º B, 3º C…). As questões só trocam de lugar dentro da mesma disciplina e do mesmo tipo, e a correção pela câmera já sabe a versão de
-                cada cartão. Depois de mudar, imprima as provas e os cartões de novo.
+                Mesma prova com as questões em ordem diferente, para evitar cola. A capa de cada prova mostra a letra da versão e o cartão-resposta tem o
+                campo VERSÃO DA PROVA: o aluno pinta a letra que está na capa e a câmera corrige pelo gabarito daquela versão. Assim dá para tirar xerox:
+                baixe uma prova em branco de cada versão (botões abaixo), copie e distribua misturado. As provas com nome saem alternando A, B, C, D pela
+                ordem de chamada. As questões só trocam de lugar dentro da mesma disciplina e do mesmo tipo.
               </p>
               <ActionForm action={setVersions.bind(null, id)} submitLabel="Salvar versões" className="mt-3">
                 <div className="flex flex-wrap gap-2">

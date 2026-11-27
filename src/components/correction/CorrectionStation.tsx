@@ -41,6 +41,8 @@ interface Shot {
   read: ReadResult;
   /** Versão da prova deste cartão (0 = A). */
   version: number;
+  /** De onde veio a versão: pintada pelo aluno, do cartão impresso ou não identificada. */
+  versionFrom: "marked" | "card" | "none";
 }
 
 type Banner =
@@ -128,15 +130,19 @@ export function CorrectionStation(props: Props) {
   const orders = props.versionOrders && props.versionOrders.length > 1 ? props.versionOrders : null;
   const keyOf = useCallback((v: number) => (orders?.[v] ? keyForVersion(answerKey, orders[v]) : answerKey), [orders, answerKey]);
   const versionOfRead = useCallback(
-    (r: ReadResult): number => {
-      if (!orders) return 0;
+    (r: ReadResult): { version: number; from: Shot["versionFrom"] } => {
+      if (!orders) return { version: 0, from: "card" };
+      // 1º: a letra que o aluno pintou no campo VERSÃO DA PROVA
+      if (r.versionMark === "ok" && r.examVersion !== null && r.examVersion !== undefined && r.examVersion < orders.length) {
+        return { version: r.examVersion, from: "marked" };
+      }
       let sheet = r.sheetNumber !== null ? props.sheets.find((s) => s.sheet_number === r.sheetNumber) : undefined;
       if (!sheet && r.rollNumber !== null) {
         const st = students.find((s) => s.roll_number === r.rollNumber);
         sheet = st ? props.sheets.find((s) => s.student_id === st.id) : undefined;
       }
       const v = sheet?.version ?? 0;
-      return v >= 0 && v < orders.length ? v : 0;
+      return { version: v >= 0 && v < orders.length ? v : 0, from: sheet ? "card" : "none" };
     },
     [orders, props.sheets, students],
   );
@@ -205,7 +211,9 @@ export function CorrectionStation(props: Props) {
       const answers = { ...shot.read.answers };
       const grade = gradeOf(answers, shot.version);
       const student = students.find((s) => s.id === ident.id);
-      if (!student || grade.needsReview || ident.source === "other-assessment") {
+      // prova com versões e o aluno não pintou (ou pintou duas) a VERSÃO DA PROVA: o professor confirma
+      const versionDoubt = !!orders && shot.versionFrom !== "marked";
+      if (!student || grade.needsReview || ident.source === "other-assessment" || versionDoubt) {
         setBanner(null);
         setReview(shot);
         setMode("review");
@@ -262,12 +270,13 @@ export function CorrectionStation(props: Props) {
   const capture = useCallback(
     (source: HTMLVideoElement | HTMLImageElement): Shot | null => {
       const photo = toCanvas(source, PHOTO_SIDE);
-      const read = readCanvas(photo, specs);
+      const read = readCanvas(photo, specs, orders?.length ?? 1);
       if (!read.ok || !read.homography) return null;
       if (read.sheetNumber !== null) recent.current.set(read.sheetNumber, Date.now());
-      return { photo, read, version: versionOfRead(read) };
+      const v = versionOfRead(read);
+      return { photo, read, version: v.version, versionFrom: v.from };
     },
-    [specs, versionOfRead],
+    [specs, versionOfRead, orders],
   );
 
   // leitura automática contínua
@@ -343,11 +352,13 @@ export function CorrectionStation(props: Props) {
   const ident = useMemo(() => (review ? identify(review.read) : { id: "", source: "" as const }), [review, identify]);
   const [studentId, setStudentId] = useState("");
   const [answers, setAnswers] = useState<Record<number, GivenAnswer>>({});
+  // só quando chega uma foto nova (trocar a versão não apaga o aluno escolhido)
+  const reviewRead = review?.read;
   useEffect(() => {
-    if (!review) return;
+    if (!reviewRead) return;
     setStudentId(ident.id);
-    setAnswers({ ...review.read.answers });
-  }, [review, ident.id]);
+    setAnswers({ ...reviewRead.answers });
+  }, [reviewRead, ident.id]);
   const grade = useMemo(() => gradeOf(answers, review?.version ?? 0), [gradeOf, answers, review]);
   const student = students.find((s) => s.id === studentId);
   const proofUrl = useMemo(
@@ -458,7 +469,30 @@ export function CorrectionStation(props: Props) {
             </div>
           )}
 
-          {orders && review && <p className="text-[13px] font-bold text-brand-700">Prova versão {versionLabel(review.version)} (numeração da versão do aluno)</p>}
+          {orders && review && (
+            <div className={`rounded-2xl p-4 ${review.versionFrom === "marked" ? "bg-brand-50" : "border border-amber-300 bg-amber-50"}`}>
+              <p className={`text-[13px] font-bold ${review.versionFrom === "marked" ? "text-brand-900" : "text-amber-900"}`}>
+                {review.versionFrom === "marked"
+                  ? `Versão da prova: ${versionLabel(review.version)} (pintada pelo aluno)`
+                  : review.read.versionMark === "multiple"
+                    ? "O aluno pintou mais de uma VERSÃO DA PROVA. Qual ele fez?"
+                    : "O aluno não pintou a VERSÃO DA PROVA. Confira na capa da prova dele:"}
+              </p>
+              <div className="mt-2 flex flex-wrap gap-1.5">
+                {orders.map((_, v) => (
+                  <button
+                    key={v}
+                    type="button"
+                    onClick={() => setReview({ ...review, version: v, versionFrom: "marked" })}
+                    className={`h-10 w-10 rounded-full text-[15px] font-extrabold ${review.version === v ? "bg-brand-900 text-white" : "border border-line bg-white text-brand-900"}`}
+                  >
+                    {versionLabel(v)}
+                  </button>
+                ))}
+              </div>
+              <p className="mt-1.5 text-[12px] text-muted">As respostas abaixo seguem a numeração dessa versão.</p>
+            </div>
+          )}
           <QuestionGrid grade={grade} specs={specs} answerKey={keyOf(review?.version ?? 0)} />
 
           {r.problems

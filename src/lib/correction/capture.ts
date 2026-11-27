@@ -22,10 +22,10 @@ export function toCanvas(src: Source, maxSide: number, target?: HTMLCanvasElemen
   return c;
 }
 
-export function readCanvas(canvas: HTMLCanvasElement, specs: SheetQuestionSpec[]): ReadResult {
+export function readCanvas(canvas: HTMLCanvasElement, specs: SheetQuestionSpec[], versions = 1): ReadResult {
   const ctx = canvas.getContext("2d", { willReadFrequently: true })!;
   const data = ctx.getImageData(0, 0, canvas.width, canvas.height);
-  return readAnswerSheet(toGray(data.data, canvas.width, canvas.height), specs);
+  return readAnswerSheet(toGray(data.data, canvas.width, canvas.height), specs, { versions });
 }
 
 /** Arquivo de imagem (galeria) → <img> carregada. */

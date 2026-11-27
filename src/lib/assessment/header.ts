@@ -14,6 +14,8 @@ export interface ExamHeader {
   appliedOn: string | null; // AAAA-MM-DD
   maxScore: number;
   instructions: string[];
+  /** Letra da versão desta cópia (provas com versões A–D); null = versão única. */
+  versionLetter: string | null;
 }
 
 export const DEFAULT_INSTRUCTIONS = [
@@ -47,6 +49,7 @@ export function examHeader(a: Assessment): ExamHeader {
     appliedOn: a.applied_on,
     maxScore: a.max_score,
     instructions: instructions.length ? instructions : DEFAULT_INSTRUCTIONS,
+    versionLetter: a.version !== null && a.version !== undefined && (a.versions ?? 1) > 1 ? ("ABCD"[a.version] ?? null) : null,
   };
 }
 

@@ -19,7 +19,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
   // Com versões: ?versao=B baixa a versão B (padrão: A).
   const versions = data.assessment.versions ?? 1;
   const v = Math.min(versions - 1, parseVersion(new URL(request.url).searchParams.get("versao")) ?? 0);
-  const assessment = versions > 1 ? { ...data.assessment, title: `${data.assessment.title} — Versão ${versionLabel(v)}` } : data.assessment;
+  const assessment = versions > 1 ? { ...data.assessment, title: `${data.assessment.title} — Versão ${versionLabel(v)}`, version: v } : data.assessment;
   const questions = versions > 1 ? questionsForVersion(data.questions, versionOrders(data.questions, versions, id)[v]) : data.questions;
   const bytes = await generateAssessmentDocx(examHeader(assessment), questions, { schoolLogo });
   return new NextResponse(toArrayBuffer(bytes), {

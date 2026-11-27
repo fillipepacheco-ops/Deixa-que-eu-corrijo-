@@ -190,3 +190,28 @@ test("Tipo B (PAS): centena, dezena e unidade no cartão, lidas e corrigidas", (
   assert.equal(g.questions.find((q) => q.number === 4)?.status, "wrong");
   assert.equal(g.questions.find((q) => q.number === 3)?.status, "pending_manual");
 });
+
+test("versão da prova: o aluno pinta a letra e a câmera lê (cópias xerox sem nome)", async () => {
+  const l = sheetLayout(q20, { versions: 4 });
+  assert.equal(l.versionBubbles.length, 4);
+  for (const v of l.versionBubbles) {
+    for (const r of l.rollBubbles) assert.ok(Math.hypot(v.x - r.x, v.y - r.y) > 5, "versão longe do nº de chamada");
+    assert.ok(v.y < 104, "versão acima da grade");
+  }
+  assert.equal(sheetLayout(q20).versionBubbles.length, 0);
+
+  const read = (version?: number | number[]) =>
+    readAnswerSheet(renderSheetPhoto({ questions: q20, sheetNumber: 777, marks: { 1: "B", 2: "D" }, versions: 4, version, roll: 12 }), q20, { versions: 4 });
+  const c = read(2);
+  assert.equal(c.ok, true, c.error ?? "");
+  assert.equal(c.examVersion, 2);
+  assert.equal(c.versionMark, "ok");
+  assert.equal(c.answers[1], "B");
+  assert.equal(c.rollNumber, 12);
+  assert.equal(read().versionMark, "none");
+  assert.equal(read([0, 3]).versionMark, "multiple");
+  assert.equal(read([0, 3]).examVersion, null);
+
+  const bytes = await generateAnswerSheetsPdf({ assessmentTitle: "Simulado", questions: q20, versions: 4, cards: [{ sheetNumber: 5 }] });
+  assert.equal((await PDFDocument.load(bytes)).getPageCount(), 1);
+});

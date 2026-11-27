@@ -130,8 +130,10 @@ export async function buildPrintPdf(
     const r = await ensureCards(supabase, assessmentId, students, blankCount, { versions, classOrder: all });
     cardOf = r.byStudent;
     blanks = r.blanks.slice(0, blankCount);
+    // O cartão é igual para todas as versões: o aluno pinta a VERSÃO DA PROVA que recebeu
+    // (funciona com cópias xerox sem nome). Na prova com nome, a capa diz qual letra pintar.
     cardsFor = (cards, v) => {
-      const h = examHeader(assessmentOf(v));
+      const h = examHeader(data.assessment);
       return generateAnswerSheetsPdf({
         assessmentTitle: h.title,
         subject: h.subject,
@@ -139,6 +141,7 @@ export async function buildPrintPdf(
         schoolName: h.schoolName,
         appliedOn: h.appliedOn,
         questions: sheetQuestionsFrom(questionsOf(v)),
+        versions,
         cards,
         logoPng: opts.appLogo ?? null,
         schoolLogo,
