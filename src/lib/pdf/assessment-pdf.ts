@@ -340,8 +340,12 @@ export async function generateAssessmentPdf(input: AssessmentPdfInput): Promise<
             const yb = y0 - i * rowH;
             if (i < rows) page.drawLine({ start: { x: left + numW, y: yb }, end: { x: left + w, y: yb }, thickness: 0.4, color: BRAND.line });
             const t = String(i);
-            const tw = regular.widthOfTextAtSize(t, 8);
-            page.drawText(t, { x: left + (numW - tw) / 2, y: yb + (rowH - 8) / 2 + 1.5, size: 8, font: regular, color: BRAND.gray });
+            // linhas 1, 5 e 10 em destaque (quadrinho escuro com o número em branco), como no PAS
+            const marked = i === 1 || i === 5 || i === 10;
+            if (marked) page.drawRectangle({ x: left, y: yb, width: numW, height: rowH, color: BRAND.dark });
+            const font = marked ? bold : regular;
+            const tw = font.widthOfTextAtSize(t, 8);
+            page.drawText(t, { x: left + (numW - tw) / 2, y: yb + (rowH - 8) / 2 + 1.5, size: 8, font, color: marked ? BRAND.white : BRAND.gray });
           }
         },
       });

@@ -359,7 +359,17 @@ function questionBlocks(q: AssessmentQuestion, number: number): (Paragraph | Tab
                   width: { size: NUM, type: WidthType.DXA },
                   margins: { left: 40, right: 40 },
                   verticalAlign: "center",
-                  children: [new Paragraph({ alignment: AlignmentType.CENTER, keepNext: i < 9, children: [new TextRun({ text: String(i + 1), size: 16, color: GRAY, font: FONT })] })],
+                  // linhas 1, 5 e 10 em destaque, como no PAS
+                  ...([0, 4, 9].includes(i) ? { shading: { type: ShadingType.CLEAR, color: "auto", fill: DARK } } : {}),
+                  children: [
+                    new Paragraph({
+                      alignment: AlignmentType.CENTER,
+                      keepNext: i < 9,
+                      children: [
+                        new TextRun({ text: String(i + 1), size: 16, font: FONT, ...([0, 4, 9].includes(i) ? { bold: true, color: "FFFFFF" } : { color: GRAY }) }),
+                      ],
+                    }),
+                  ],
                 }),
                 new TableCell({ width: { size: COL_W - NUM, type: WidthType.DXA }, children: [new Paragraph({ keepNext: i < 9, children: [] })] }),
               ],
