@@ -101,7 +101,7 @@ export default async function AvaliacaoPage({ params }: { params: Promise<{ id: 
           <Card className="mb-6 p-5">
             <details open={(assessment.versions ?? 1) > 1}>
               <summary className="cursor-pointer font-bold text-brand-900">
-                Versões da prova {(assessment.versions ?? 1) > 1 ? `· ${VERSION_LETTERS.slice(0, assessment.versions).join(", ")}` : "· versão única"}
+                Tipos de prova (versões) {(assessment.versions ?? 1) > 1 ? `· ${VERSION_LETTERS.slice(0, assessment.versions).join(", ")}` : "· só um tipo"}
               </summary>
               <p className="mt-2 text-[13px] text-muted">
                 Mesma prova com as questões em ordem diferente, para evitar cola. A capa de cada prova mostra a letra da versão e o cartão-resposta tem o

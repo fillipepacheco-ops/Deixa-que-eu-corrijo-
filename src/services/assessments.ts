@@ -24,14 +24,19 @@ function readHeader(formData: FormData) {
     max_score: Number.isFinite(max) && max > 0 ? max : 10,
     // "" = automático (pelo título ou pela data)
     term: ["1", "2", "3", "4"].includes(s("term")) ? Number(s("term")) : null,
+    // tipos de prova A–D (questões em ordem diferente); campo ausente = não mexe
+    ...(formData.has("versions") ? { versions: Math.max(1, Math.min(4, Math.floor(Number(s("versions"))) || 1)) } : {}),
   };
 }
 
 /** Banco ainda sem a coluna "term" (atualização 0005 não rodada): salva sem o bimestre. */
-const missingTerm = (e: { message: string } | null) => !!e && /\bterm\b/.test(e.message) && /(column|schema cache)/i.test(e.message);
-const withoutTerm = <T extends { term?: number | null }>(d: T) => {
+const missingTerm = (e: { message: string } | null) =>
+  !!e && /\b(term|versions)\b/.test(e.message) && /(column|schema cache)/i.test(e.message);
+/** Sem as colunas novas (atualizações 0005/0011 não rodadas): salva sem bimestre e sem tipos de prova. */
+const withoutTerm = <T extends { term?: number | null; versions?: number }>(d: T) => {
   const copy = { ...d };
   delete copy.term;
+  delete copy.versions;
   return copy;
 };
 
@@ -115,9 +120,15 @@ export async function updateAssessment(id: string, _: FormState, formData: FormD
   if (!data.title) return { error: "A avaliação precisa de um título." };
   await fillFromClass(data);
   const supabase = await createClient();
+  const { data: before } = await supabase.from("assessments").select("*").eq("id", id).maybeSingle();
   let { error } = await supabase.from("assessments").update(data).eq("id", id);
   if (missingTerm(error)) ({ error } = await supabase.from("assessments").update(withoutTerm(data)).eq("id", id));
   if (error) return { error: `Não foi possível salvar. (${error.message})` };
+  // mudou o número de tipos de prova: redistribui os cartões já criados
+  const prevVersions = Number((before as { versions?: number } | null)?.versions ?? 1);
+  if (data.versions !== undefined && data.versions !== prevVersions) {
+    await redistributeCards(supabase, id, data.class_id ?? (before?.class_id as string | null) ?? null, data.versions);
+  }
   await rememberSchool(data);
   revalidatePath(`/avaliacoes/${id}`);
   revalidatePath("/avaliacoes");
@@ -318,7 +329,18 @@ export async function setVersions(assessmentId: string, _: FormState, formData: 
   if (!a) return { error: "Avaliação não encontrada." };
   const { error } = await supabase.from("assessments").update({ versions: n }).eq("id", assessmentId);
   if (error) return { error: /versions/.test(error.message) ? "Rode antes a migração 0011_prova_multi.sql no Supabase." : error.message };
+  await redistributeCards(supabase, assessmentId, a.class_id as string | null, n);
+  revalidatePath(`/avaliacoes/${assessmentId}`);
+  revalidatePath(`/correcao/${assessmentId}`);
+  return {
+    ok: true,
+    message: n > 1 ? `Prova em ${n} tipos (versões). Imprima as provas e os cartões de novo.` : "Prova em versão única. Imprima as provas e os cartões de novo.",
+  };
+}
 
+/** Cartões já criados: versão de cada aluno pela ordem de chamada (A, B, C, D…). */
+async function redistributeCards(supabase: Awaited<ReturnType<typeof createClient>>, assessmentId: string, classId: string | null, n: number) {
+  const a = { class_id: classId };
   const [{ data: sheets }, { data: students }] = await Promise.all([
     supabase.from("answer_sheets").select("id, student_id").eq("assessment_id", assessmentId).order("sheet_number"),
     a.class_id
@@ -331,10 +353,4 @@ export async function setVersions(assessmentId: string, _: FormState, formData: 
     const i = sh.student_id ? (idx.get(sh.student_id) ?? 0) : blank++;
     await supabase.from("answer_sheets").update({ version: n > 1 ? i % n : 0 }).eq("id", sh.id);
   }
-  revalidatePath(`/avaliacoes/${assessmentId}`);
-  revalidatePath(`/correcao/${assessmentId}`);
-  return {
-    ok: true,
-    message: n > 1 ? `Prova em ${n} versões. Imprima as provas e os cartões de novo.` : "Prova em versão única. Imprima as provas e os cartões de novo.",
-  };
 }

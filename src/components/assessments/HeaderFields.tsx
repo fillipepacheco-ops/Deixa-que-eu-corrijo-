@@ -13,6 +13,7 @@ export interface HeaderValues {
   max_score?: number | null;
   instructions?: string | null;
   term?: number | null;
+  versions?: number | null;
 }
 
 function Group({ title, hint, children }: { title: string; hint?: string; children: React.ReactNode }) {
@@ -62,6 +63,15 @@ export function HeaderFields({
                 {t}º bimestre
               </option>
             ))}
+          </select>
+        </div>
+        <div>
+          <label className="label" htmlFor="versions">Tipos de prova (versões)</label>
+          <select className="field" id="versions" name="versions" defaultValue={String(value.versions ?? 1)}>
+            <option value="1">Só uma (todos iguais)</option>
+            <option value="2">2 tipos (A e B)</option>
+            <option value="3">3 tipos (A, B e C)</option>
+            <option value="4">4 tipos (A, B, C e D)</option>
           </select>
         </div>
         <div>
