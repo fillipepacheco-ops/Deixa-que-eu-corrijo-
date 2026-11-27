@@ -59,13 +59,6 @@ export function MultiExamFields({
           <input className="field" name="max_score" inputMode="decimal" defaultValue={String(value.max_score ?? 10).replace(".", ",")} />
         </div>
         <div>
-          <label className="label">Alternativas por questão</label>
-          <select className="field" name="option_count" defaultValue={String(value.option_count ?? 5)}>
-            <option value="5">5 (A a E)</option>
-            <option value="4">4 (A a D)</option>
-          </select>
-        </div>
-        <div>
           <label className="label">Versões da prova</label>
           <select className="field" name="versions" defaultValue={String(value.versions ?? 4)}>
             <option value="4">4 versões (A, B, C, D)</option>

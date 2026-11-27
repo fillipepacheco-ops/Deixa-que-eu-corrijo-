@@ -15,8 +15,8 @@ export interface QuestionImageHandle {
  * Imagem da questão (gráfico, figura, mapa...). Vai para o Storage do
  * professor já reduzida; na prova ela é ajustada sozinha à largura da coluna.
  */
-export const QuestionImage = forwardRef<QuestionImageHandle, { initialPath?: string | null; initialUrl?: string | null }>(
-  function QuestionImage({ initialPath, initialUrl }, ref) {
+export const QuestionImage = forwardRef<QuestionImageHandle, { initialPath?: string | null; initialUrl?: string | null; folder?: string }>(
+  function QuestionImage({ initialPath, initialUrl, folder }, ref) {
     const [path, setPath] = useState(initialPath ?? "");
     const [preview, setPreview] = useState(initialUrl ?? "");
     const [busy, setBusy] = useState(false);
@@ -33,7 +33,7 @@ export const QuestionImage = forwardRef<QuestionImageHandle, { initialPath?: str
           data: { user },
         } = await supabase.auth.getUser();
         if (!user) throw new Error("Sessão expirada. Entre de novo.");
-        const newPath = `${user.id}/questao-${Date.now()}.jpg`;
+        const newPath = `${user.id}/${folder ? `${folder}/` : ""}questao-${Date.now()}.jpg`;
         const { error: upErr } = await supabase.storage.from("question-images").upload(newPath, jpeg, { contentType: "image/jpeg" });
         if (upErr) throw new Error(upErr.message);
         setPath(newPath);

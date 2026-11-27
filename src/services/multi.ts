@@ -3,7 +3,10 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
-import { OPTION_LETTERS, buildMultiQuestions, type MultiQuestion, type MultiSlot } from "@/lib/multi/build";
+import { buildMultiQuestions, type MultiQuestion, type MultiSlot } from "@/lib/multi/build";
+import { blankQuestion, parseQuestionForm } from "@/lib/assessment/question-form";
+import { importedToRows } from "@/lib/import/to-rows";
+import type { QuestionType } from "@/lib/models/types";
 import type { FormState } from "./classes";
 
 const str = (f: FormData, k: string) => String(f.get(k) ?? "").trim();
@@ -21,7 +24,6 @@ function examFields(f: FormData) {
     class_ids: f.getAll("class_ids").map(String).filter(Boolean),
     applied_on: str(f, "applied_on") || null,
     term: ["1", "2", "3", "4"].includes(str(f, "term")) ? Number(str(f, "term")) : null,
-    option_count: str(f, "option_count") === "4" ? 4 : 5,
     versions: clampInt(f.get("versions"), 1, 4, 4),
     max_score: Math.min(100, Math.max(0.5, Number(str(f, "max_score").replace(",", ".")) || 10)),
     instructions: str(f, "instructions") || null,
@@ -114,27 +116,148 @@ export async function moveSlot(examId: string, slotId: string, dir: -1 | 1) {
   revalidatePath(`/prova-multi/${examId}`);
 }
 
-/** Professor (ou coordenação): salva uma questão da sua parte. */
-export async function saveMultiQuestion(slotId: string, position: number, _: FormState, f: FormData): Promise<FormState> {
+const NOT_OPEN = "A coordenação já gerou esta prova. Peça para reabrir se precisar mudar algo.";
+const blocked = (m: string) => /row-level security|violates/i.test(m);
+
+/** Professor (ou coordenação): salva uma questão (editor completo: todos os tipos, fórmulas, imagem). */
+export async function saveMultiQuestion(slotId: string, questionId: string, _: FormState, f: FormData): Promise<FormState> {
+  const parsed = parseQuestionForm(f);
+  if (!parsed.ok) return { error: parsed.error };
   const supabase = await createClient();
-  const { data: slot } = await supabase.from("multi_slots").select("id, exam_id, question_count, multi_exams(option_count, status)").eq("id", slotId).maybeSingle();
-  if (!slot) return { error: "Convite não encontrado." };
-  const exam = slot.multi_exams as unknown as { option_count: number; status: string } | null;
-  if (position < 1 || position > slot.question_count) return { error: "Questão fora do combinado." };
-  const count = exam?.option_count === 4 ? 4 : 5;
-  const statement = String(f.get("statement") ?? "").replace(/\r\n/g, "\n").trim().slice(0, 6000);
-  const options = OPTION_LETTERS.slice(0, count).map((l) => ({ label: l, text: str(f, `opt_${l}`).slice(0, 1500) }));
-  const correctRaw = str(f, "correct");
-  const correct = (OPTION_LETTERS.slice(0, count) as readonly string[]).includes(correctRaw) ? correctRaw : null;
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  const d = parsed.data;
+  // imagem: só da própria pasta da Prova Multi (ou a que já estava)
+  const { data: cur } = await supabase.from("multi_questions").select("image_path").eq("id", questionId).maybeSingle();
+  const image = d.image_path && (d.image_path === cur?.image_path || (user && d.image_path.startsWith(`${user.id}/multi/${slotId}/`) && !d.image_path.includes(".."))) ? d.image_path : null;
   const { error } = await supabase
     .from("multi_questions")
-    .upsert({ slot_id: slotId, exam_id: slot.exam_id, position, statement, options, correct, updated_at: new Date().toISOString() }, { onConflict: "slot_id,position" });
-  if (error) {
-    if (exam?.status === "fechada" || /row-level security/i.test(error.message)) return { error: "A coordenação já fechou esta prova. Peça para reabrir se precisar mudar algo." };
-    return { error: error.message };
-  }
+    .update({
+      type: d.type,
+      statement: d.statement.slice(0, 20000),
+      options: d.options,
+      correct_answers: d.correct_answers,
+      correct: d.correct_answers[0] ?? null,
+      weight: d.weight,
+      annulled: d.annulled,
+      image_path: image,
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", questionId)
+    .eq("slot_id", slotId);
+  if (error) return { error: blocked(error.message) ? NOT_OPEN : error.message };
   revalidatePath(`/colaborar/${slotId}`);
-  return { ok: true, message: `Questão ${position} salva.` };
+  return { ok: true };
+}
+
+async function nextPosition(supabase: Awaited<ReturnType<typeof createClient>>, slotId: string) {
+  const { data } = await supabase.from("multi_questions").select("position").eq("slot_id", slotId).order("position", { ascending: false }).limit(1);
+  return (data?.[0]?.position ?? 0) + 1;
+}
+async function slotExam(supabase: Awaited<ReturnType<typeof createClient>>, slotId: string) {
+  const { data } = await supabase.from("multi_slots").select("exam_id, question_count").eq("id", slotId).maybeSingle();
+  return data;
+}
+
+/** Nova questão em branco do tipo escolhido. */
+export async function addMultiQuestion(slotId: string, type: QuestionType) {
+  const supabase = await createClient();
+  const slot = await slotExam(supabase, slotId);
+  if (!slot) return;
+  await supabase.from("multi_questions").insert({ ...blankQuestion(type), slot_id: slotId, exam_id: slot.exam_id, position: await nextPosition(supabase, slotId) });
+  revalidatePath(`/colaborar/${slotId}`);
+}
+
+/** Começo rápido: cria de uma vez as questões pedidas (múltipla escolha, em branco). */
+export async function startMultiQuestions(slotId: string) {
+  const supabase = await createClient();
+  const slot = await slotExam(supabase, slotId);
+  if (!slot) return;
+  const start = await nextPosition(supabase, slotId);
+  const n = Math.max(1, slot.question_count - (start - 1));
+  await supabase
+    .from("multi_questions")
+    .insert(Array.from({ length: n }, (_, i) => ({ ...blankQuestion("multiple_choice"), slot_id: slotId, exam_id: slot.exam_id, position: start + i })));
+  revalidatePath(`/colaborar/${slotId}`);
+}
+
+export async function removeMultiQuestion(slotId: string, questionId: string) {
+  const supabase = await createClient();
+  await supabase.from("multi_questions").delete().eq("id", questionId).eq("slot_id", slotId);
+  await renumber(supabase, slotId);
+  revalidatePath(`/colaborar/${slotId}`);
+}
+
+async function renumber(supabase: Awaited<ReturnType<typeof createClient>>, slotId: string, order?: string[]) {
+  const { data } = await supabase.from("multi_questions").select("id, position").eq("slot_id", slotId).order("position");
+  const ids = order ?? (data ?? []).map((q) => q.id as string);
+  const pos = new Map((data ?? []).map((q) => [q.id as string, q.position as number]));
+  for (const [i, id] of ids.entries()) if (pos.get(id) !== i + 1) await supabase.from("multi_questions").update({ position: i + 1 }).eq("id", id);
+}
+
+export async function moveMultiQuestion(slotId: string, questionId: string, dir: -1 | 1) {
+  const supabase = await createClient();
+  const { data } = await supabase.from("multi_questions").select("id").eq("slot_id", slotId).order("position");
+  const ids = (data ?? []).map((q) => q.id as string);
+  const i = ids.indexOf(questionId);
+  const j = i + dir;
+  if (i < 0 || j < 0 || j >= ids.length) return;
+  [ids[i], ids[j]] = [ids[j], ids[i]];
+  await renumber(supabase, slotId, ids);
+  revalidatePath(`/colaborar/${slotId}`);
+}
+
+export async function duplicateMultiQuestion(slotId: string, questionId: string) {
+  const supabase = await createClient();
+  const { data: q } = await supabase.from("multi_questions").select("*").eq("id", questionId).maybeSingle();
+  if (!q) return;
+  const { id: _id, updated_at: _u, ...rest } = q;
+  void _id;
+  void _u;
+  await supabase.from("multi_questions").insert({ ...rest, position: await nextPosition(supabase, slotId) });
+  revalidatePath(`/colaborar/${slotId}`);
+}
+
+/** Importar questões de PDF/Word para a parte do professor. */
+export async function appendImportedMulti(slotId: string, imported: unknown): Promise<FormState> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { error: "Sessão expirada. Entre de novo." };
+  const parsed = importedToRows(imported, user.id);
+  if (!parsed.ok) return { error: parsed.error };
+  const slot = await slotExam(supabase, slotId);
+  if (!slot) return { error: "Convite não encontrado." };
+  // questões em branco do "começo rápido" são substituídas
+  const { data: existing } = await supabase.from("multi_questions").select("id, statement, options, image_path").eq("slot_id", slotId);
+  const blanks = (existing ?? []).filter((q) => !String(q.statement ?? "").trim() && !q.image_path && !(q.options as { text: string }[] | null)?.some((o) => o.text?.trim()));
+  if (blanks.length) await supabase.from("multi_questions").delete().in("id", blanks.map((q) => q.id));
+  await renumber(supabase, slotId);
+  const start = await nextPosition(supabase, slotId);
+  if (start - 1 + parsed.rows.length > 80) return { error: "São no máximo 80 questões por professor." };
+  const { error } = await supabase.from("multi_questions").insert(
+    parsed.rows.map((r, i) => ({
+      ...r,
+      image_path: r.image_path && r.image_path.startsWith(`${user.id}/multi/${slotId}/`) ? r.image_path : null,
+      correct: r.correct_answers[0] ?? null,
+      slot_id: slotId,
+      exam_id: slot.exam_id,
+      position: start + i,
+    })),
+  );
+  if (error) return { error: blocked(error.message) ? NOT_OPEN : `Não foi possível salvar as questões. (${error.message})` };
+  revalidatePath(`/colaborar/${slotId}`);
+  return { ok: true };
+}
+
+/** Notas da disciplina do professor na Prova Multi (todas as turmas). */
+export async function slotResults(slotId: string) {
+  const supabase = await createClient();
+  const { data, error } = await supabase.rpc("multi_slot_results", { p_slot: slotId });
+  if (error) return null;
+  return data as unknown;
 }
 
 /** Professor: "terminei" (ou desfaz). */
@@ -170,12 +293,23 @@ export async function generateMulti(examId: string, _: FormState, __: FormData):
     supabase.auth.getUser(),
   ]);
   if (!slots?.length) return { error: "Cadastre os professores antes de gerar a prova." };
-  const { rows, problems } = buildMultiQuestions(slots as MultiSlot[], (qs ?? []) as MultiQuestion[], exam.option_count);
+  const { rows, problems, short } = buildMultiQuestions(slots as MultiSlot[], (qs ?? []) as MultiQuestion[]);
+  if (!rows.length && !problems.length) return { error: "Os professores ainda não mandaram nenhuma questão." };
   if (problems.length) {
     return { error: `Ainda falta completar ${problems.length === 1 ? "1 questão" : `${problems.length} questões`}:\n• ${problems.slice(0, 8).join("\n• ")}${problems.length > 8 ? "\n• …" : ""}` };
   }
   const { data: me } = await supabase.from("profiles").select("full_name").eq("id", auth.user?.id ?? "").maybeSingle();
   const sch = school as { name?: string; logo_path?: string | null } | null;
+
+  // imagens dos professores: copia para a pasta da coordenação (a prova não depende mais delas)
+  const uid = auth.user?.id ?? "";
+  for (const r of rows) {
+    if (!r.image_path || r.image_path.startsWith(`${uid}/`)) continue;
+    const dest = `${uid}/multi/${examId}/${r.multi_slot_id}-${r.position}-${Date.now()}.jpg`;
+    const { error } = await supabase.storage.from("question-images").copy(r.image_path, dest);
+    if (error) return { error: `Não foi possível copiar a imagem de uma questão (${r.section}). (${error.message})` };
+    r.image_path = dest;
+  }
 
   // avaliações já geradas antes (atualiza em vez de duplicar)
   const { data: existing } = exam.assessment_ids?.length
@@ -220,6 +354,6 @@ export async function generateMulti(examId: string, _: FormState, __: FormData):
   revalidatePath("/avaliacoes");
   return {
     ok: true,
-    message: `Prova gerada para ${ids.length} ${ids.length === 1 ? "turma" : "turmas"}, com ${rows.length} questões e ${exam.versions} ${exam.versions === 1 ? "versão" : "versões"}. A edição dos professores foi fechada.`,
+    message: `Prova gerada para ${ids.length} ${ids.length === 1 ? "turma" : "turmas"}, com ${rows.length} questões e ${exam.versions} ${exam.versions === 1 ? "versão" : "versões"}. A edição dos professores foi fechada.${short.length ? `\nAtenção — mandaram menos questões que o pedido: ${short.join("; ")}.` : ""}`,
   };
 }

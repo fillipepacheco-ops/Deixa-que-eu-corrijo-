@@ -25,7 +25,21 @@ type Status = { s: "idle" } | { s: "busy"; msg: string } | { s: "done" } | { s: 
  *  mode "new"    → fica dentro do formulário de nova avaliação (campo oculto "imported")
  *  mode "append" → botão para acrescentar numa avaliação existente
  */
-export function ImportExam({ mode, assessmentId }: { mode: "new" | "append"; assessmentId?: string }) {
+export function ImportExam({
+  mode,
+  assessmentId,
+  imageFolder,
+  appendAction,
+  doneHref,
+}: {
+  mode: "new" | "append";
+  assessmentId?: string;
+  /** Subpasta das imagens no Storage (ex.: Prova Multi). */
+  imageFolder?: string;
+  /** Outra ação para gravar as questões (ex.: Prova Multi). */
+  appendAction?: (imported: unknown) => Promise<{ error?: string; ok?: boolean }>;
+  doneHref?: string;
+}) {
   const [items, setItems] = useState<Item[]>([]);
   const [warnings, setWarnings] = useState<string[]>([]);
   const [fileName, setFileName] = useState("");
@@ -83,7 +97,7 @@ export function ImportExam({ mode, assessmentId }: { mode: "new" | "append"; ass
           setStatus({ s: "busy", msg: `Enviando imagens… ${n} de ${withImage}` });
           try {
             const jpeg = await toJpeg(images.get(imgs[0])!, 1600, 0.9);
-            const path = `${user.id}/importada-${Date.now()}-${q.number}.jpg`;
+            const path = `${user.id}/${imageFolder ? `${imageFolder}/` : ""}importada-${Date.now()}-${q.number}.jpg`;
             const { error } = await supabase.storage.from("question-images").upload(path, jpeg, { contentType: "image/jpeg" });
             if (error) throw error;
             item.image_path = path;
@@ -119,9 +133,14 @@ export function ImportExam({ mode, assessmentId }: { mode: "new" | "append"; ass
   function append() {
     setSaveError("");
     start(async () => {
-      const r = await appendImportedQuestions(assessmentId!, JSON.parse(payload));
+      const r = appendAction ? await appendAction(JSON.parse(payload)) : await appendImportedQuestions(assessmentId!, JSON.parse(payload));
       if (r.error) setSaveError(r.error);
-      else router.push(`/avaliacoes/${assessmentId}`);
+      else if (appendAction) {
+        setItems([]);
+        setStatus({ s: "idle" });
+        if (doneHref) router.push(doneHref);
+        router.refresh();
+      } else router.push(`/avaliacoes/${assessmentId}`);
     });
   }
 

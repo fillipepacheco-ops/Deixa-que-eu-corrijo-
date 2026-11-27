@@ -5,31 +5,33 @@ import { buildMultiQuestions, missingOf, slotProgress } from "../src/lib/multi/b
 const opts = (n: number) => ["A", "B", "C", "D", "E"].slice(0, n).map((l) => ({ label: l, text: `alt ${l}` }));
 const slots = [
   { id: "m", position: 2, teacher_name: "Bia", discipline: "Matemática", question_count: 1 },
-  { id: "p", position: 1, teacher_name: "Ana", discipline: "Português", question_count: 2 },
+  { id: "p", position: 1, teacher_name: "Ana", discipline: "Português", question_count: 3 },
 ];
 
-test("monta seções na ordem dos professores", () => {
+test("monta seções na ordem dos professores, com todos os tipos", () => {
   const qs = [
-    { slot_id: "m", position: 1, statement: "M1", options: opts(5), correct: "E" },
-    { slot_id: "p", position: 2, statement: "P2", options: opts(5), correct: "B" },
-    { slot_id: "p", position: 1, statement: "P1", options: opts(5), correct: "A" },
+    { slot_id: "m", position: 1, type: "numeric" as const, statement: "M1", options: [], correct_answers: ["42"] },
+    { slot_id: "p", position: 2, type: "essay" as const, statement: "P2", options: [] },
+    { slot_id: "p", position: 1, statement: "P1", options: opts(4), correct: "A", image_path: "u/multi/p/x.jpg" },
   ];
-  const r = buildMultiQuestions(slots, qs, 5);
+  const r = buildMultiQuestions(slots, qs);
   assert.deepEqual(r.problems, []);
-  assert.deepEqual(r.rows.map((q) => [q.position, q.section, q.statement, q.correct_answers[0]]), [
-    [1, "Português", "P1", "A"],
-    [2, "Português", "P2", "B"],
-    [3, "Matemática", "M1", "E"],
-  ]);
+  assert.deepEqual(r.short, ["Português (Ana): 2 de 3"]);
+  assert.deepEqual(
+    r.rows.map((q) => [q.position, q.section, q.type, q.statement, q.correct_answers.join(), q.multi_slot_id]),
+    [
+      [1, "Português", "multiple_choice", "P1", "A", "p"],
+      [2, "Português", "essay", "P2", "", "p"],
+      [3, "Matemática", "numeric", "M1", "42", "m"],
+    ],
+  );
+  assert.equal(r.rows[0].image_path, "u/multi/p/x.jpg");
 });
 
 test("aponta o que falta", () => {
-  const qs = [{ slot_id: "p", position: 1, statement: "P1", options: opts(4), correct: null }];
-  const r = buildMultiQuestions(slots, qs, 5);
-  assert.equal(r.rows.length, 0);
-  assert.equal(r.problems.length, 3);
-  assert.match(r.problems[0], /alternativa E, gabarito/);
-  assert.match(r.problems[1], /questão 2: falta enunciado/);
-  assert.deepEqual(missingOf({ slot_id: "p", position: 1, statement: "x", options: opts(4), correct: "D" }, 4), []);
-  assert.deepEqual(slotProgress(slots[1], qs, 4), { ready: 0, total: 2 });
+  assert.deepEqual(missingOf({ slot_id: "p", position: 1, statement: "", options: opts(1), correct_answers: [] }), ["enunciado", "alternativas", "gabarito"]);
+  assert.deepEqual(missingOf({ slot_id: "p", position: 1, statement: "", image_path: "x.jpg", type: "true_false", options: [], correct_answers: ["C"] }), []);
+  const qs = [{ slot_id: "p", position: 1, statement: "P1", options: opts(5), correct_answers: [] }];
+  assert.match(buildMultiQuestions(slots, qs).problems[0], /questão 1: falta gabarito/);
+  assert.deepEqual(slotProgress(slots[1], qs), { ready: 0, made: 1, total: 3, asked: 3 });
 });

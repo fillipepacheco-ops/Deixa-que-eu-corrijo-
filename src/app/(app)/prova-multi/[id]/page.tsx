@@ -30,7 +30,7 @@ export default async function ProvaMultiDetail({ params }: { params: Promise<{ i
 
   const [{ data: slotsData }, { data: qs }, schools, { data: classes }, { data: generated }] = await Promise.all([
     supabase.from("multi_slots").select("*").eq("exam_id", id).order("position"),
-    supabase.from("multi_questions").select("slot_id, position, statement, options, correct").eq("exam_id", id),
+    supabase.from("multi_questions").select("*").eq("exam_id", id),
     loadSchools(supabase),
     supabase.from("classes").select("id, name, school_id").order("name"),
     exam.assessment_ids?.length ? supabase.from("assessments").select("id, classes(name)").in("id", exam.assessment_ids) : Promise.resolve({ data: [] }),
@@ -40,9 +40,9 @@ export default async function ProvaMultiDetail({ params }: { params: Promise<{ i
   const h = await headers();
   const origin = `${h.get("x-forwarded-proto") ?? "https"}://${h.get("x-forwarded-host") ?? h.get("host")}`;
 
-  const progress = slots.map((s) => slotProgress(s, questions, exam.option_count));
+  const progress = slots.map((s) => slotProgress(s, questions));
   const ready = progress.reduce((a, p) => a + p.ready, 0);
-  const total = progress.reduce((a, p) => a + p.total, 0);
+  const total = progress.reduce((a, p) => a + Math.max(p.asked, p.made), 0);
   const className = new Map((classes ?? []).map((c) => [c.id, c.name]));
 
   return (
@@ -103,10 +103,11 @@ export default async function ProvaMultiDetail({ params }: { params: Promise<{ i
                 </div>
                 <div className="mt-3">
                   <div className="h-2 overflow-hidden rounded-full bg-brand-50">
-                    <div className="h-full rounded-full bg-brand-500" style={{ width: `${p.total ? (p.ready / p.total) * 100 : 0}%` }} />
+                    <div className="h-full rounded-full bg-brand-500" style={{ width: `${Math.min(100, (p.ready / Math.max(1, p.asked)) * 100)}%` }} />
                   </div>
                   <p className="mt-1 text-[12px] text-muted">
-                    {p.ready} de {p.total} {p.total === 1 ? "questão pronta" : "questões prontas"}
+                    {p.ready} de {p.asked} {p.asked === 1 ? "questão pronta" : "questões prontas"}
+                    {p.made > p.asked && ` · mandou ${p.made}`}
                   </p>
                 </div>
                 <div className="mt-3 flex flex-wrap items-center gap-2">

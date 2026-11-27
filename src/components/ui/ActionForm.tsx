@@ -36,7 +36,7 @@ export function ActionForm({
     <form ref={ref} action={formAction} className={className}>
       {children}
       {state.error && <p className="mt-3 whitespace-pre-line rounded-lg bg-red-50 px-3 py-2 text-sm text-red-800">{state.error}</p>}
-      {state.ok && (state.message || successText) && <p className="mt-3 text-sm font-medium text-brand-700">{state.message || successText}</p>}
+      {state.ok && (state.message || successText) && <p className="mt-3 whitespace-pre-line text-sm font-medium text-brand-700">{state.message || successText}</p>}
       <div className="mt-4">
         <SubmitButton className={submitClassName}>{submitLabel}</SubmitButton>
       </div>

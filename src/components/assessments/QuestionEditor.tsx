@@ -37,6 +37,8 @@ export function QuestionEditor({
   moveUp,
   moveDown,
   duplicate,
+  imageFolder,
+  allowAnnul = true,
 }: {
   q: AssessmentQuestion;
   number: number;
@@ -49,6 +51,9 @@ export function QuestionEditor({
   moveUp: () => Promise<void>;
   moveDown: () => Promise<void>;
   duplicate: () => Promise<void>;
+  /** Subpasta das imagens no Storage (ex.: Prova Multi). */
+  imageFolder?: string;
+  allowAnnul?: boolean;
 }) {
   const [type, setType] = useState<QuestionType>(q.type);
   const [state, action] = useActionState<State, FormData>(save, {});
@@ -127,7 +132,7 @@ export function QuestionEditor({
 
           <div>
             <label className="label">Imagem da questão</label>
-            <QuestionImage ref={imageRef} initialPath={q.image_path} initialUrl={imageUrl} />
+            <QuestionImage ref={imageRef} initialPath={q.image_path} initialUrl={imageUrl} folder={imageFolder} />
           </div>
 
           {type === "multiple_choice" && (
@@ -204,10 +209,12 @@ export function QuestionEditor({
 
           {type === "essay" && <p className="rounded-lg bg-brand-50 px-3 py-2 text-[13px] text-brand-900">Discursiva: a prova sai com 6 linhas para resposta e a nota é lançada pelo professor.</p>}
 
-          <label className="flex items-center gap-2 text-[14px]">
-            <input type="checkbox" name="annulled" defaultChecked={q.annulled} className="h-4 w-4 accent-[#b42318]" />
-            Anular questão (ponto para todos)
-          </label>
+          {allowAnnul && (
+            <label className="flex items-center gap-2 text-[14px]">
+              <input type="checkbox" name="annulled" defaultChecked={q.annulled} className="h-4 w-4 accent-[#b42318]" />
+              Anular questão (ponto para todos)
+            </label>
+          )}
 
           {state.error && <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-800">{state.error}</p>}
           {state.ok && <p className="text-sm font-medium text-brand-700">Questão salva.</p>}
