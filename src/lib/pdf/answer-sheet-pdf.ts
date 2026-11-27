@@ -125,7 +125,8 @@ export async function generateAnswerSheetsPdf(input: AnswerSheetInput): Promise<
     field("Disciplina", input.subject ?? "", 14, 61, 64);
     field("Turma", input.className ?? "", 82, 61, 32);
     field("Data", formatDateBR(input.appliedOn), 118, 61, 32);
-    field("Escola", input.schoolName ?? "", 14, 73, 136);
+    field("Escola", input.schoolName ?? "", 14, 73, 64);
+    field("Assinatura do(a) estudante", "", 82, 73, 68);
 
     // Nº de chamada: só nos cartões sem aluno definido.
     if (!card.studentName) {

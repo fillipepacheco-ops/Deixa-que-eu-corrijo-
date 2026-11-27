@@ -38,7 +38,8 @@ import { imageSize } from "@/lib/assessment/image-size";
 import { markupToDocx } from "./math-runs";
 
 const FONT = "Arial";
-const SIZE = 24; // meio-pontos → 12 pt
+const SIZE = 20; // meio-pontos → 10 pt (questões)
+const COVER = 22; // capa: 11 pt
 const LINE_15 = { line: 360, lineRule: LineRuleType.AUTO }; // espaçamento 1,5
 const DARK = "0B3A1E";
 const MID = "137A1A";
@@ -69,7 +70,7 @@ function fieldCell(label: string, value: string, width: number) {
       }),
       new Paragraph({
         spacing: { after: 20 },
-        children: [new TextRun({ text: value || " ", size: SIZE, font: FONT })],
+        children: [new TextRun({ text: value || " ", size: COVER, font: FONT })],
       }),
     ],
   });
@@ -111,7 +112,7 @@ function coverPage(h: ExamHeader, opts: DocxOptions): (Paragraph | Table)[] {
       new Paragraph({
         alignment: AlignmentType.CENTER,
         spacing: { after: 80 },
-        children: [new TextRun({ text: h.schoolName.toUpperCase(), bold: true, size: SIZE, color: DARK, font: FONT })],
+        children: [new TextRun({ text: h.schoolName.toUpperCase(), bold: true, size: COVER, color: DARK, font: FONT })],
       }),
     );
   }
@@ -129,7 +130,7 @@ function coverPage(h: ExamHeader, opts: DocxOptions): (Paragraph | Table)[] {
         alignment: AlignmentType.CENTER,
         spacing: { after: 280 },
         border: { bottom: { style: BorderStyle.SINGLE, size: 12, color: MID, space: 8 } },
-        children: [new TextRun({ text: sub, size: SIZE, color: GRAY, font: FONT })],
+        children: [new TextRun({ text: sub, size: COVER, color: GRAY, font: FONT })],
       }),
     );
   }
@@ -159,13 +160,18 @@ function coverPage(h: ExamHeader, opts: DocxOptions): (Paragraph | Table)[] {
         ]),
       ],
     }),
+    new Table({
+      width: { size: CONTENT_W, type: WidthType.DXA },
+      columnWidths: [CONTENT_W],
+      rows: [row([["Assinatura do(a) estudante", "", CONTENT_W]])],
+    }),
   );
 
   out.push(
     new Paragraph({
       spacing: { before: 360, after: 120 },
       shading: { type: ShadingType.CLEAR, color: "auto", fill: LIGHT },
-      children: [new TextRun({ text: "INSTRUÇÕES", bold: true, size: SIZE, color: DARK, font: FONT })],
+      children: [new TextRun({ text: "INSTRUÇÕES", bold: true, size: COVER, color: DARK, font: FONT })],
     }),
     ...h.instructions.map(
       (text) =>
@@ -173,14 +179,14 @@ function coverPage(h: ExamHeader, opts: DocxOptions): (Paragraph | Table)[] {
           numbering: { reference: "instrucoes", level: 0 },
           alignment: AlignmentType.JUSTIFIED,
           spacing: { ...LINE_15, after: 60 },
-          children: [new TextRun({ text, size: SIZE, font: FONT })],
+          children: [new TextRun({ text, size: COVER, font: FONT })],
         }),
     ),
     new Paragraph({
       alignment: AlignmentType.CENTER,
       spacing: { before: 480 },
       children: [
-        new TextRun({ text: "AGUARDE A AUTORIZAÇÃO DO APLICADOR PARA INICIAR A PROVA.", bold: true, size: SIZE, color: DARK, font: FONT }),
+        new TextRun({ text: "AGUARDE A AUTORIZAÇÃO DO APLICADOR PARA INICIAR A PROVA.", bold: true, size: COVER, color: DARK, font: FONT }),
       ],
     }),
   );

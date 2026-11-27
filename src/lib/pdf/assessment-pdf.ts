@@ -45,7 +45,7 @@ export const TEMPLATES: Record<Exclude<PdfTemplate, "personalizado">, TemplateCo
   // justificado, espaçamento 1,5, "QUESTÃO 01" e capa com cabeçalho
   // (mesmos dados do cartão-resposta).
   larga_escala: {
-    columns: 2, fontSize: 12, header: "band", showGradeBox: false, showSignature: false,
+    columns: 2, fontSize: 10, header: "band", showGradeBox: false, showSignature: false,
     questionHeading: "label", showWeights: true, essayLines: 6,
     lineHeight: 1.725, justify: true, coverPage: true,
   },
@@ -538,18 +538,21 @@ export async function generateAssessmentPdf(input: AssessmentPdfInput): Promise<
     top += rowH;
     field("Disciplina", h.subject, MARGIN_X, half);
     field("Professor(a)", h.teacherName, MARGIN_X + half, half);
+    top += rowH;
+    field("Assinatura do(a) estudante", "", MARGIN_X, contentW);
     top += rowH + mm(9);
 
     p.drawRectangle({ x: MARGIN_X, y: A4.h - top - 18, width: contentW, height: 18, color: BRAND.light });
     drawTextTop(p, "INSTRUÇÕES", { x: MARGIN_X + 5, top: top + 4, size: 12, font: bold, color: BRAND.dark });
     top += 26;
     const numW = mm(8);
+    const IS = 11; // instruções
     h.instructions.forEach((text, i) => {
-      drawTextTop(p, `${i + 1}.`, { x: MARGIN_X + 4, top, size: 12, font: bold, color: BRAND.mid });
-      const lines = wrapLines(regular, 12, text, contentW - numW - 4);
+      drawTextTop(p, `${i + 1}.`, { x: MARGIN_X + 4, top, size: IS, font: bold, color: BRAND.mid });
+      const lines = wrapLines(regular, IS, text, contentW - numW - 4);
       lines.forEach((line) => {
-        drawLine(p, line, { x: MARGIN_X + numW, top, size: 12, font: regular, width: contentW - numW - 4, justify: true });
-        top += 12 * 1.725;
+        drawLine(p, line, { x: MARGIN_X + numW, top, size: IS, font: regular, width: contentW - numW - 4, justify: true });
+        top += IS * 1.725;
       });
       top += 3;
     });
