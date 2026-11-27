@@ -336,12 +336,18 @@ export async function generateMulti(examId: string, _: FormState, __: FormData):
       term: exam.term,
     };
     let id = byClass.get(turma.id);
+    // banco sem a coluna do bimestre (atualização 0005 não rodada): grava sem ela
+    const noTerm = (e: { message: string } | null) => !!e && /\bterm\b/.test(e.message) && /(column|schema cache)/i.test(e.message);
+    const { term: _term, ...headerNoTerm } = header;
+    void _term;
     if (id) {
-      const { error } = await supabase.from("assessments").update(header).eq("id", id);
+      let { error } = await supabase.from("assessments").update(header).eq("id", id);
+      if (noTerm(error)) ({ error } = await supabase.from("assessments").update(headerNoTerm).eq("id", id));
       if (error) return { error: `Não foi possível atualizar a prova de ${turma.name}. (${error.message})` };
       await supabase.from("assessment_questions").delete().eq("assessment_id", id);
     } else {
-      const { data: created, error } = await supabase.from("assessments").insert({ ...header, status: "draft" }).select("id").single();
+      let { data: created, error } = await supabase.from("assessments").insert({ ...header, status: "draft" }).select("id").single();
+      if (noTerm(error)) ({ data: created, error } = await supabase.from("assessments").insert({ ...headerNoTerm, status: "draft" }).select("id").single());
       if (error || !created) return { error: `Não foi possível criar a prova de ${turma.name}. (${error?.message ?? "erro"})` };
       id = created.id as string;
     }
