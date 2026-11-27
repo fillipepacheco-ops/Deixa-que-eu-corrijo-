@@ -28,6 +28,7 @@ export async function signUp(_: AuthState, formData: FormData): Promise<AuthStat
   const fullName = String(formData.get("full_name") ?? "").trim();
   const email = String(formData.get("email") ?? "").trim();
   const password = String(formData.get("password") ?? "");
+  const plan = formData.get("plan") === "direcao" ? "direcao" : "professor";
   if (!fullName || !email) return { error: "Informe nome e e-mail." };
   if (password.length < 8) return { error: "A senha precisa ter pelo menos 8 caracteres." };
 
@@ -36,13 +37,13 @@ export async function signUp(_: AuthState, formData: FormData): Promise<AuthStat
   const { data, error } = await supabase.auth.signUp({
     email,
     password,
-    options: { data: { full_name: fullName }, emailRedirectTo: `${origin}/auth/confirm` },
+    options: { data: { full_name: fullName, plan }, emailRedirectTo: `${origin}/auth/confirm` },
   });
   if (error) return { error: translate(error.message) };
   if (!data.session) {
-    return { message: "Conta criada! Enviamos um link de confirmação para o seu e-mail." };
+    return { message: "Conta criada! Enviamos um link de confirmação para o seu e-mail. Depois de confirmar, entre para fazer o pagamento." };
   }
-  redirect("/dashboard");
+  redirect("/assinatura");
 }
 
 export async function signOut() {

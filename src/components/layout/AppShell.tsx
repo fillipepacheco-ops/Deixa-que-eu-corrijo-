@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState } from "react";
-import { LogOut, Menu, X } from "lucide-react";
+import { LogOut, Menu, ShieldCheck, X } from "lucide-react";
 import { Logo } from "@/components/brand/Logo";
 import { signOut } from "@/services/auth";
 import { NAV, type NavItem } from "./nav";
@@ -41,15 +41,20 @@ export function AppShell({
   teacherName,
   schools = [],
   currentSchool = "",
-  extraNav = [],
+  isAdmin = false,
+  banner,
   children,
 }: {
   teacherName: string;
   schools?: { id: string; name: string }[];
   currentSchool?: string;
-  extraNav?: NavItem[];
+  /** Só a conta do gestor vê a aba Gestão. */
+  isAdmin?: boolean;
+  /** Aviso no topo (ex.: mensalidade vencida). */
+  banner?: React.ReactNode;
   children: React.ReactNode;
 }) {
+  const extraNav: NavItem[] = isAdmin ? [{ href: "/gestao", label: "Gestão", icon: ShieldCheck, ready: true }] : [];
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
   const isActive = (href: string) => pathname === href || pathname.startsWith(`${href}/`);
@@ -109,7 +114,10 @@ export function AppShell({
         </div>
       )}
 
-      <main className="mx-auto max-w-6xl px-4 pb-28 pt-6 sm:px-6 lg:px-10 lg:pb-12 lg:pt-10">{children}</main>
+      <main className="mx-auto max-w-6xl px-4 pb-28 pt-6 sm:px-6 lg:px-10 lg:pb-12 lg:pt-10">
+        {banner}
+        {children}
+      </main>
 
       {/* Barra inferior (celular) */}
       <nav className="fixed inset-x-0 bottom-0 z-30 grid grid-cols-5 border-t border-line bg-white pb-[env(safe-area-inset-bottom)] lg:hidden">

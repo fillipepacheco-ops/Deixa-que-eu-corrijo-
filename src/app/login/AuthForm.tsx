@@ -4,8 +4,8 @@ import { useActionState, useState } from "react";
 import { signIn, signUp, type AuthState } from "@/services/auth";
 import { SubmitButton } from "@/components/ui/SubmitButton";
 
-export function AuthForm() {
-  const [mode, setMode] = useState<"entrar" | "criar">("entrar");
+export function AuthForm({ plan, initialMode = "entrar" }: { plan?: "professor" | "direcao"; initialMode?: "entrar" | "criar" } = {}) {
+  const [mode, setMode] = useState<"entrar" | "criar">(initialMode);
   const [inState, inAction] = useActionState<AuthState, FormData>(signIn, {});
   const [upState, upAction] = useActionState<AuthState, FormData>(signUp, {});
   const state = mode === "entrar" ? inState : upState;
@@ -20,6 +20,7 @@ export function AuthForm() {
       </p>
 
       <form action={mode === "entrar" ? inAction : upAction} className="mt-7 space-y-4">
+        {mode === "criar" && plan && <input type="hidden" name="plan" value={plan} />}
         {mode === "criar" && (
           <div>
             <label className="label" htmlFor="full_name">Nome completo</label>
