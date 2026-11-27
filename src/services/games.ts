@@ -107,7 +107,7 @@ export async function deleteGame(gameId: string) {
  */
 export async function saveGameResults(gameId: string): Promise<{ ok: boolean; saved?: number; skipped?: number; error?: string }> {
   const supabase = await createClient();
-  const { data: game } = await supabase.from("games").select("id, assessment_id").eq("id", gameId).maybeSingle();
+  const { data: game } = await supabase.from("games").select("id, assessment_id, current_index").eq("id", gameId).maybeSingle();
   if (!game?.assessment_id) return { ok: false, error: "Este jogo não está ligado a uma avaliação." };
   const data = await loadAssessment(supabase, game.assessment_id);
   if (!data?.row.class_id) return { ok: false, error: "A avaliação não tem turma." };
@@ -118,7 +118,11 @@ export async function saveGameResults(gameId: string): Promise<{ ok: boolean; sa
     supabase.from("submissions").select("student_id, source").eq("assessment_id", game.assessment_id),
   ]);
   const positionOf = new Map((gq ?? []).map((q) => [q.idx as number, (q.position as number | null) ?? (q.idx as number) + 1]));
-  const key = keyFromQuestions(data.questions);
+  // Jogo encerrado antes da hora: as questões do jogo que não chegaram a ser jogadas não contam.
+  const played = new Set((gq ?? []).filter((q) => (q.idx as number) <= (game.current_index ?? -1)).map((q) => positionOf.get(q.idx as number)));
+  const inGame = new Set((gq ?? []).map((q) => positionOf.get(q.idx as number)));
+  const key = keyFromQuestions(data.questions).filter((k) => !inGame.has(k.number) || played.has(k.number));
+  if (!key.some((k) => played.has(k.number))) return { ok: false, error: "Nenhuma questão foi jogada: nenhuma nota foi lançada." };
   const keep = new Set((existing ?? []).filter((s) => s.source === "camera" || s.source === "manual").map((s) => s.student_id as string));
 
   const rows: Record<string, unknown>[] = [];

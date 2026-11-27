@@ -370,7 +370,18 @@ export function GameHost({
 
             {status === "reveal" && <RevealPanel players={players} answers={answers} hits={hits} misses={misses} noAnswer={noAnswer} />}
 
-            <div className="flex justify-end gap-3">
+            <div className="flex flex-wrap items-center justify-end gap-3">
+              <EndEarly onEnd={() => go("finished")} disabled={busy} />
+              <span className="flex-1" />
+              {status === "reveal" && (
+                <button
+                  onClick={() => go("ranking")}
+                  disabled={busy}
+                  className="flex items-center gap-2 rounded-2xl bg-white px-6 py-4 text-[18px] font-black text-[#0b3b29] shadow-xl hover:scale-105"
+                >
+                  <Trophy size={22} /> Ver o ranking
+                </button>
+              )}
               {status === "question" && (
                 <button onClick={() => go("reveal")} disabled={busy} className="rounded-2xl bg-white/15 px-5 py-3 text-[16px] font-bold text-white hover:bg-white/25">
                   Encerrar a questão agora
@@ -401,15 +412,31 @@ export function GameHost({
         {/* ---------- CERIMÔNIA ---------- */}
         {status === "finished" && <Ceremony ranked={ranked} step={ceremony} onReveal={reveal} notice={notice} />}
 
-        {/* partida antiga parada no ranking (versão anterior do jogo) */}
+        {/* ---------- RANKING ENTRE AS QUESTÕES (só posições, nunca pontos) ---------- */}
         {status === "ranking" && (
-          <div className="grid flex-1 place-items-center">
-            <button
-              onClick={() => (last ? go("finished") : go("question", index + 1))}
-              className="rounded-2xl bg-[#7cc520] px-8 py-4 text-[20px] font-black text-[#0b3b29]"
-            >
-              {last ? "Encerrar a partida" : "Próxima questão"}
-            </button>
+          <div className="flex flex-1 flex-col gap-4">
+            <RankingBoard ranked={ranked} after={index + 1} total={questions.length} />
+            <div className="flex flex-wrap items-center justify-end gap-3">
+              <EndEarly onEnd={() => go("finished")} disabled={busy} />
+              <span className="flex-1" />
+              {last ? (
+                <button
+                  onClick={() => go("finished")}
+                  disabled={busy}
+                  className="flex items-center gap-2 rounded-2xl bg-[#7cc520] px-7 py-4 text-[20px] font-black text-[#0b3b29] shadow-xl hover:scale-105"
+                >
+                  <Trophy size={24} /> Encerrar a partida e ir para a cerimônia
+                </button>
+              ) : (
+                <button
+                  onClick={() => go("question", index + 1)}
+                  disabled={busy}
+                  className="flex items-center gap-2 rounded-2xl bg-[#7cc520] px-7 py-4 text-[20px] font-black text-[#0b3b29] shadow-xl hover:scale-105"
+                >
+                  <SkipForward size={24} /> Próxima questão ({index + 2} de {questions.length})
+                </button>
+              )}
+            </div>
           </div>
         )}
       </main>
@@ -431,6 +458,52 @@ export function GameHost({
         />
       )}
     </GameBackdrop>
+  );
+}
+
+/** Encerrar o jogo antes da última questão (as questões que não foram jogadas não contam na nota). */
+function EndEarly({ onEnd, disabled }: { onEnd: () => void; disabled: boolean }) {
+  return (
+    <button
+      onClick={() => {
+        if (window.confirm("Encerrar o jogo agora? As questões que ainda não foram jogadas não contam na nota. Os bloqueados serão liberados e a cerimônia começa.")) onEnd();
+      }}
+      disabled={disabled}
+      className="flex items-center gap-2 rounded-2xl bg-black/25 px-4 py-3 text-[15px] font-bold text-white hover:bg-black/35"
+    >
+      <X size={18} /> Encerrar o jogo
+    </button>
+  );
+}
+
+/** Classificação parcial: só a posição de cada um — os pontos nunca aparecem. */
+function RankingBoard({ ranked, after, total }: { ranked: (Player & { position: number })[]; after: number; total: number }) {
+  const medal = (pos: number) => (pos === 1 ? "🥇" : pos === 2 ? "🥈" : pos === 3 ? "🥉" : null);
+  const shown = ranked.slice(0, 15);
+  return (
+    <div className="flex flex-1 flex-col items-center gap-4 pt-2 text-white">
+      <h2 className="flex items-center gap-3 text-[34px] font-black drop-shadow sm:text-[44px]">
+        <Trophy size={40} className="text-[#7cc520]" /> Ranking
+      </h2>
+      <p className="-mt-2 text-[16px] font-bold text-white/75">
+        Depois de {after} de {total} {total === 1 ? "questão" : "questões"} · os pontos só o app sabe
+      </p>
+      <ol className="grid w-full max-w-4xl gap-2 sm:grid-cols-2">
+        {shown.map((p) => (
+          <li
+            key={p.id}
+            className={`flex items-center gap-3 rounded-2xl px-4 py-3 text-[20px] font-extrabold shadow-lg ${
+              p.position === 1 ? "bg-[#7cc520] text-[#0b3b29] sm:col-span-2 sm:text-[26px]" : p.position <= 3 ? "bg-white text-[#0b3b29]" : "bg-white/85 text-slate-900"
+            }`}
+          >
+            <span className="w-12 text-center text-[24px] font-black">{medal(p.position) ?? `${p.position}º`}</span>
+            <span className="min-w-0 flex-1 truncate">{p.name}</span>
+            {p.locked && <Lock size={18} className="opacity-60" />}
+          </li>
+        ))}
+      </ol>
+      {ranked.length > shown.length && <p className="text-[15px] font-bold text-white/75">+ {ranked.length - shown.length} participantes</p>}
+    </div>
   );
 }
 

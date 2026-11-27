@@ -196,6 +196,12 @@ export function GamePlayer({ initialPin }: { initialPin: string }) {
           <Question key={state.index} state={state} creds={creds} remaining={remainingSeconds(state.started_at, state.question.time_limit, offset, now)} onSent={fetchState} />
         ) : state.status === "reveal" ? (
           <Result state={state} />
+        ) : state.status === "ranking" ? (
+          <div className="flex flex-1 flex-col items-center justify-center gap-3 text-center text-white">
+            <p className="text-[72px] leading-none">🏆</p>
+            <h2 className="text-[30px] font-black">Ranking no telão!</h2>
+            <p className="text-[16px] font-bold text-white/85">Olhe para o telão. A próxima questão já vem.</p>
+          </div>
         ) : state.status === "finished" ? (
           <Final state={state} onLeave={leave} />
         ) : (
@@ -520,7 +526,7 @@ function Result({ state }: { state: PlayerState }) {
           Resposta certa: <MathPreview text={correctText} />
         </div>
       )}
-      <p className="text-[15px] font-semibold text-white/80">Os pontos e o ranking só aparecem na cerimônia, no final.</p>
+      <p className="text-[15px] font-semibold text-white/80">Os pontos não aparecem. Olhe o telão: o professor pode mostrar o ranking.</p>
     </div>
   );
 }
