@@ -106,6 +106,10 @@ export default async function JogosPage({ searchParams }: { searchParams: Promis
                     </label>
                   ))}
                 </div>
+                <p className="mt-1.5 text-[12px] text-muted">
+                  Em dupla ou trio, um celular entra e toca nos nomes dos colegas da lista da turma. A nota da equipe vai para cada integrante, no
+                  boletim de cada um.
+                </p>
               </fieldset>
 
               <div>

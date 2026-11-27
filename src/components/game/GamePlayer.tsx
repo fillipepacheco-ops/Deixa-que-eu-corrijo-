@@ -302,7 +302,12 @@ function Join({ initialPin, onJoined }: { initialPin: string; onJoined: (c: Cred
             {info.students.length > 0 ? (
               <>
                 <p className="text-center text-[15px] font-bold text-white">
-                  {info.team_size === 1 ? "Toque no seu nome" : `Toquem nos nomes da equipe (até ${info.team_size})`}
+                  {info.team_size === 1 ? "Toque no seu nome" : `Toquem nos nomes de todos da equipe (até ${info.team_size})`}
+                  {info.team_size > 1 && (
+                    <span className="block text-[12px] font-semibold text-white/80">
+                      Só um celular por equipe. Cada integrante recebe a nota no próprio boletim. {picked.length}/{info.team_size} escolhidos
+                    </span>
+                  )}
                 </p>
                 <div className="max-h-[42dvh] space-y-1.5 overflow-y-auto rounded-2xl bg-white/10 p-2">
                   {info.students.map((s) => {

@@ -170,6 +170,7 @@ export function GameHost({
           refresh();
         }
       } catch (e) {
+        revealing.current = false; // deixa tentar de novo
         setError(e instanceof Error ? e.message : "Erro ao mudar a fase do jogo.");
       } finally {
         setBusy(false);
@@ -190,15 +191,17 @@ export function GameHost({
   const answeredIds = new Set(answers.map((a) => a.player_id));
   const allAnswered = active.length > 0 && active.every((p) => answeredIds.has(p.id));
 
-  // tempo acabou ou todos responderam → encerra a questão e mostra o resultado
+  // tempo acabou ou todos responderam → encerra a questão e mostra o resultado.
+  // (O relógio atualiza a tela 5x por segundo; o encerramento não pode ser cancelado por isso.)
+  const timeUp = remaining <= 0;
+  const shouldReveal = status === "question" && !!q && (timeUp || allAnswered);
+  const goRef = useRef(go);
+  goRef.current = go;
   useEffect(() => {
-    if (status !== "question" || revealing.current) return;
-    if (remaining <= 0 || allAnswered) {
-      revealing.current = true;
-      const t = setTimeout(() => go("reveal"), allAnswered && remaining > 0 ? 700 : 0);
-      return () => clearTimeout(t);
-    }
-  }, [status, remaining, allAnswered, go]);
+    if (!shouldReveal || revealing.current) return;
+    revealing.current = true;
+    setTimeout(() => goRef.current("reveal"), timeUp ? 0 : 800);
+  }, [shouldReveal, timeUp]);
 
   const hits = answers.filter((a) => a.correct).length;
   const misses = answers.length - hits;
@@ -226,7 +229,21 @@ export function GameHost({
   return (
     <GameBackdrop>
       <header className="flex items-center gap-3 px-4 py-3 sm:px-8">
-        <Link href="/jogos" className="grid h-10 w-10 place-items-center rounded-xl bg-white/10 text-white hover:bg-white/20" title="Sair do telão">
+        <Link
+          href="/jogos"
+          onClick={async (e) => {
+            // sair no meio do jogo: encerrar libera todos os bloqueados e salva as notas
+            if (status === "question" || status === "reveal") {
+              e.preventDefault();
+              if (window.confirm("Encerrar o jogo agora? Todos os alunos bloqueados serão liberados e as notas vão para Resultados.")) {
+                await go("finished");
+                window.location.href = "/jogos";
+              }
+            }
+          }}
+          className="grid h-10 w-10 place-items-center rounded-xl bg-white/10 text-white hover:bg-white/20"
+          title="Sair do telão"
+        >
           <ArrowLeft size={20} />
         </Link>
         <GameLogo />
