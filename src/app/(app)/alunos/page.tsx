@@ -4,6 +4,7 @@ import { Search } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { Card, EmptyState, PageHeader } from "@/components/ui/PageHeader";
 import { buttonClass } from "@/components/ui/button";
+import { classIdsOfCurrent } from "@/services/school-context";
 
 export const metadata: Metadata = { title: "Alunos" };
 
@@ -11,12 +12,18 @@ export default async function AlunosPage({ searchParams }: { searchParams: Promi
   const { turma, q } = await searchParams;
   const supabase = await createClient();
 
-  const { data: classes } = await supabase.from("classes").select("id, name").order("name");
+  // escola escolhida no menu: só as turmas e alunos dela
+  const only = await classIdsOfCurrent(supabase);
+  const ids = only && only.length ? only : ["00000000-0000-0000-0000-000000000000"];
+  let classesQuery = supabase.from("classes").select("id, name").order("name");
+  if (only) classesQuery = classesQuery.in("id", ids);
+  const { data: classes } = await classesQuery;
   let query = supabase
     .from("students")
     .select("id, name, registration, roll_number, class_id, classes(name)")
     .order("name")
     .limit(500);
+  if (only) query = query.in("class_id", ids);
   if (turma) query = query.eq("class_id", turma);
   if (q?.trim()) query = query.ilike("name", `%${q.trim()}%`);
   const { data: students } = await query;

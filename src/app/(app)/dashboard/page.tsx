@@ -15,6 +15,7 @@ import {
 import { createClient } from "@/lib/supabase/server";
 import { Card } from "@/components/ui/PageHeader";
 import { buttonClass } from "@/components/ui/button";
+import { currentSchool } from "@/services/school-context";
 
 export const metadata: Metadata = { title: "Dashboard" };
 
@@ -88,20 +89,36 @@ export default async function DashboardPage() {
   const { data: profile } = await supabase.from("profiles").select("full_name").eq("id", user!.id).maybeSingle();
   const firstName = (profile?.full_name ?? "").trim().split(" ")[0];
 
+  // Escola escolhida no topo do menu: só os números dela.
+  const { current } = await currentSchool(supabase);
+  let only: string[] | null = null; // turmas da escola (null = todas as escolas)
+  let onlyAssessments: string[] | null = null;
+  if (current) {
+    const { data: cls } = await supabase.from("classes").select("id").eq("school_id", current.id);
+    only = (cls ?? []).map((c) => c.id as string);
+    const { data: as } = only.length ? await supabase.from("assessments").select("id").in("class_id", only) : { data: [] };
+    onlyAssessments = (as ?? []).map((a) => a.id as string);
+  }
+  const none = "00000000-0000-0000-0000-000000000000"; // filtro vazio sem erro
+  const inList = (ids: string[]) => (ids.length ? ids : [none]);
   const [classes, students, assessments, pending, graded] = await Promise.all([
-    count("classes"),
-    count("students"),
-    count("assessments"),
-    count("submissions", (q) => q.eq("status", "needs_review")),
-    count("submissions", (q) => q.eq("status", "confirmed")),
+    count("classes", (q) => (only ? q.in("id", inList(only)) : q)),
+    count("students", (q) => (only ? q.in("class_id", inList(only)) : q)),
+    count("assessments", (q) => (only ? q.in("class_id", inList(only)) : q)),
+    count("submissions", (q) => {
+      const f = q.eq("status", "needs_review");
+      return onlyAssessments ? f.in("assessment_id", inList(onlyAssessments)) : f;
+    }),
+    count("submissions", (q) => {
+      const f = q.eq("status", "confirmed");
+      return onlyAssessments ? f.in("assessment_id", inList(onlyAssessments)) : f;
+    }),
   ]);
-  const { data: recentClasses } = await supabase
-    .from("classes")
-    .select("id, name, subject, students(count)")
-    .order("created_at", { ascending: false })
-    .limit(5);
+  let recentQuery = supabase.from("classes").select("id, name, subject, students(count)").order("created_at", { ascending: false }).limit(5);
+  if (only) recentQuery = recentQuery.in("id", inList(only));
+  const { data: recentClasses } = await recentQuery;
 
-  const firstAccess = classes === 0;
+  const firstAccess = classes === 0 && !current;
   const stats = [
     { label: "Turmas", value: classes },
     { label: "Alunos", value: students },
@@ -113,7 +130,9 @@ export default async function DashboardPage() {
     <>
       {/* Saudação */}
       <section className="mb-6 overflow-hidden rounded-3xl bg-brand-900 px-6 py-6 text-white sm:px-8 sm:py-7">
-        <p className="text-[12px] font-bold uppercase tracking-wider text-lime">Menos burocracia. Mais tempo para ensinar.</p>
+        <p className="text-[12px] font-bold uppercase tracking-wider text-lime">
+          {current ? `Mostrando só: ${current.name}` : "Menos burocracia. Mais tempo para ensinar."}
+        </p>
         <h1 className="mt-1.5 text-[26px] font-extrabold leading-tight tracking-tight sm:text-3xl">
           {firstAccess ? "Bem-vindo ao Deixa que eu Corrijo" : `Olá${firstName ? `, ${firstName}` : ""}!`}
         </h1>
