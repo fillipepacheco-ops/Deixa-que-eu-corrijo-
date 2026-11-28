@@ -25,11 +25,10 @@ export async function copyAssessmentToClass(
     if (same?.length) return { id: same[0].id as string, created: false };
   }
   // escola da turma de destino (nome e logo no cabeçalho)
-  let school: { name?: string; logo_path?: string | null } | null = null;
-  if (turma.school_id) {
-    const { data } = await supabase.from("schools").select("*").eq("id", turma.school_id).maybeSingle();
-    school = data as typeof school;
-  }
+  type School = { name?: string; logo_path?: string | null };
+  const school: School | null = turma.school_id
+    ? (((await supabase.from("schools").select("*").eq("id", turma.school_id).maybeSingle()).data as School | null) ?? null)
+    : null;
   const { data: row, error } = await supabase
     .from("assessments")
     .insert({
