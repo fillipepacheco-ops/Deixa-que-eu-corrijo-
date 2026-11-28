@@ -235,3 +235,72 @@ T = {
 
 # Área de cada disciplina
 AREA = {"Matemática": "Matemática e suas Tecnologias", "Física": "Ciências da Natureza", "Química": "Ciências da Natureza", "Biologia": "Ciências da Natureza"}
+
+# ---------- 1º dia: Linguagens e Ciências Humanas (classificação manual; sem palavras-chave) ----------
+T1 = {
+"Língua Portuguesa": {
+  "Interpretação e compreensão de texto": ["Tema e ideia central", "Inferência e informação implícita", "Finalidade e intenção do texto", "Argumentação e ponto de vista", "Humor, ironia e efeitos de sentido"],
+  "Gêneros textuais": ["Gêneros jornalísticos (notícia, reportagem, artigo, crônica)", "Gêneros publicitários e campanhas", "Gêneros digitais e da internet", "Gêneros instrucionais, científicos e de divulgação", "Charge, tirinha e cartum"],
+  "Variação linguística": ["Variedades regionais, sociais e históricas", "Norma-padrão e preconceito linguístico", "Oralidade e escrita"],
+  "Funções da linguagem": ["Funções da linguagem (referencial, emotiva, conativa, metalinguística, poética, fática)"],
+  "Gramática e recursos linguísticos": ["Coesão e conectivos", "Pontuação, aspas e sinais gráficos", "Classes de palavras e seus efeitos", "Sintaxe, concordância e regência", "Semântica, sinonímia e polissemia", "Formação de palavras e neologismos", "Estrangeirismos e empréstimos"],
+  "Intertextualidade e linguagem figurada": ["Intertextualidade, paródia e paráfrase", "Figuras de linguagem"],
+},
+"Literatura": {
+  "Escolas literárias": ["Trovadorismo, Humanismo e Classicismo", "Barroco e Arcadismo", "Romantismo", "Realismo, Naturalismo e Parnasianismo", "Simbolismo e Pré-Modernismo", "Modernismo (1ª, 2ª e 3ª fases)", "Literatura contemporânea"],
+  "Gêneros e elementos literários": ["Poesia: eu lírico, versificação e recursos", "Prosa: narrador, personagem, tempo e espaço", "Teatro e texto dramático", "Literatura e outras artes"],
+  "Diversidade na literatura": ["Literatura afro-brasileira e indígena", "Literatura de autoria feminina", "Literatura africana de língua portuguesa", "Literatura de cordel e popular"],
+},
+"Artes": {
+  "Artes visuais": ["Pintura, escultura e gravura", "Arte contemporânea, instalação e performance", "Fotografia e cinema", "Arquitetura, design e urbanismo", "Vanguardas europeias e Arte Moderna"],
+  "Música, dança e teatro": ["Música", "Dança", "Teatro e circo"],
+  "Arte e cultura": ["Patrimônio, arte popular e cultura afro-brasileira e indígena", "Arte e sociedade"],
+},
+"Educação Física": {
+  "Práticas corporais": ["Esporte e jogos", "Dança, ginástica e lutas", "Corpo, saúde, estética e qualidade de vida", "Esporte, mídia e sociedade"],
+},
+"Tecnologias da Informação e Comunicação": {
+  "Tecnologia e comunicação": ["Internet, redes sociais e linguagem digital", "Impactos sociais da tecnologia", "Fake news, desinformação e mídia"],
+},
+"Língua Inglesa": {
+  "Compreensão de texto em inglês": ["Ideia central e finalidade do texto", "Informação específica e vocabulário", "Gêneros: poema, letra de música, quadrinho e charge", "Temas sociais e culturais"],
+},
+"Língua Espanhola": {
+  "Compreensão de texto em espanhol": ["Ideia central e finalidade do texto", "Informação específica e vocabulário", "Gêneros: poema, letra de música, quadrinho e charge", "Temas sociais e culturais"],
+},
+"História": {
+  "História Antiga e Medieval": ["Antiguidade Clássica (Grécia e Roma)", "Antiguidade Oriental e outras sociedades", "Idade Média e feudalismo", "Islã e Império Bizantino"],
+  "História Moderna": ["Renascimento, Reformas e Absolutismo", "Expansão marítima e colonização", "Iluminismo e revoluções (Inglesa, Francesa, Industrial)"],
+  "História Contemporânea": ["Imperialismo e neocolonialismo", "Primeira Guerra e Revolução Russa", "Totalitarismos e Segunda Guerra", "Guerra Fria e descolonização", "Mundo atual e globalização"],
+  "Brasil Colônia": ["Economia colonial (açúcar, mineração)", "Escravidão africana e resistência", "Povos indígenas e colonização", "Revoltas e conjurações coloniais"],
+  "Brasil Império": ["Independência e Primeiro Reinado", "Período Regencial e revoltas", "Segundo Reinado, café e abolição"],
+  "Brasil República": ["República Velha (Primeira República)", "Era Vargas", "República Populista (1946–1964)", "Ditadura Militar", "Redemocratização e Nova República"],
+  "Temas de História": ["América pré-colombiana e América Latina", "História da África", "Cidadania, direitos e movimentos sociais", "Trabalho, cultura e cotidiano", "Patrimônio, memória e fontes históricas"],
+},
+"Geografia": {
+  "Geografia física": ["Clima e fenômenos atmosféricos", "Relevo, solos e geologia", "Hidrografia e recursos hídricos", "Biomas, vegetação e domínios morfoclimáticos"],
+  "Questões ambientais": ["Impactos ambientais e desenvolvimento sustentável", "Mudanças climáticas e acordos internacionais", "Recursos naturais e energia"],
+  "Geografia humana": ["População, demografia e migrações", "Urbanização e problemas urbanos", "Espaço agrário e agropecuária", "Indústria e economia", "Transportes e circulação"],
+  "Geopolítica e globalização": ["Globalização e blocos econômicos", "Conflitos, fronteiras e territórios", "Ordem mundial e geopolítica"],
+  "Cartografia": ["Mapas, escalas e projeções", "Coordenadas, fusos e orientação"],
+  "Geografia do Brasil": ["Regionalização e território brasileiro", "Povos tradicionais, quilombolas e indígenas"],
+},
+"Filosofia": {
+  "Filosofia antiga": ["Pré-socráticos", "Sócrates e Platão", "Aristóteles", "Filosofia helenística"],
+  "Filosofia medieval e moderna": ["Filosofia medieval (Agostinho, Tomás de Aquino)", "Racionalismo e empirismo (Descartes, Locke, Hume)", "Kant e o Iluminismo", "Contratualistas (Hobbes, Locke, Rousseau)", "Maquiavel e o poder"],
+  "Filosofia contemporânea": ["Nietzsche, Marx e a crítica da modernidade", "Existencialismo e fenomenologia", "Escola de Frankfurt e indústria cultural", "Filosofia política contemporânea (Arendt, Foucault)"],
+  "Temas de Filosofia": ["Ética e moral", "Teoria do conhecimento", "Política, poder e Estado", "Estética, linguagem e ciência"],
+},
+"Sociologia": {
+  "Teoria sociológica": ["Durkheim, Weber e Marx", "Pensamento social brasileiro"],
+  "Temas de Sociologia": ["Cultura, identidade e diversidade", "Trabalho e sociedade", "Desigualdade, classes e estratificação", "Movimentos sociais e cidadania", "Gênero, raça e minorias", "Violência, controle social e instituições", "Indústria cultural, mídia e consumo", "Religião e sociedade"],
+},
+}
+AREA.update({
+  "Língua Portuguesa": "Linguagens, Códigos e suas Tecnologias", "Literatura": "Linguagens, Códigos e suas Tecnologias",
+  "Artes": "Linguagens, Códigos e suas Tecnologias", "Educação Física": "Linguagens, Códigos e suas Tecnologias",
+  "Tecnologias da Informação e Comunicação": "Linguagens, Códigos e suas Tecnologias",
+  "Língua Inglesa": "Linguagens, Códigos e suas Tecnologias", "Língua Espanhola": "Linguagens, Códigos e suas Tecnologias",
+  "História": "Ciências Humanas e suas Tecnologias", "Geografia": "Ciências Humanas e suas Tecnologias",
+  "Filosofia": "Ciências Humanas e suas Tecnologias", "Sociologia": "Ciências Humanas e suas Tecnologias",
+})

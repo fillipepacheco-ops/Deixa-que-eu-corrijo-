@@ -6,7 +6,7 @@ import { PageHeader, EmptyState } from "@/components/ui/PageHeader";
 import { MathPreview } from "@/components/math/MathPreview";
 import { BankFilters, type BankFilterValues } from "@/components/banco/BankFilters";
 import { BankAddForm } from "@/components/banco/BankAddForm";
-import { ENEM_AREAS, ENEM_QUESTIONS, ENEM_YEARS, TAXONOMY, filterBank, sourceLabel, tagCounts } from "@/lib/banco/enem";
+import { ENEM_AREAS, ENEM_DAY_COUNTS, ENEM_QUESTIONS, ENEM_YEARS, TAXONOMY, filterBank, numberLabel, sourceLabel, tagCounts } from "@/lib/banco/enem";
 
 export const metadata: Metadata = { title: "Banco de Questões" };
 
@@ -61,10 +61,8 @@ export default async function BancoPage({ searchParams }: { searchParams: Promis
       />
 
       <div className="mb-5 flex flex-wrap gap-2 text-[13px] font-bold">
-        <span className="rounded-full bg-brand-900 px-3.5 py-1.5 text-white">ENEM · Natureza e Matemática ({ENEM_QUESTIONS.length})</span>
-        <span className="rounded-full border border-line px-3.5 py-1.5 text-muted" title="Em preparação">
-          ENEM · Linguagens e Humanas — em breve
-        </span>
+        <span className="rounded-full bg-brand-900 px-3.5 py-1.5 text-white">ENEM · Linguagens e Humanas ({ENEM_DAY_COUNTS.d1})</span>
+        <span className="rounded-full bg-brand-900 px-3.5 py-1.5 text-white">ENEM · Natureza e Matemática ({ENEM_DAY_COUNTS.d2})</span>
         <span className="rounded-full border border-line px-3.5 py-1.5 text-muted" title="Em preparação">
           PAS (por etapa) — em breve
         </span>
@@ -93,7 +91,7 @@ export default async function BancoPage({ searchParams }: { searchParams: Promis
                   <input type="checkbox" name="ids" value={q.id} className="mt-0.5 h-5 w-5 shrink-0 accent-[#137a1a]" />
                   <span className="min-w-0 flex-1">
                     <span className="block text-[13px] font-extrabold text-brand-900">
-                      {sourceLabel(q)} · Questão {q.n}
+                      {sourceLabel(q)} · {numberLabel(q)}
                       {q.nul && <span className="ml-2 rounded-full bg-red-50 px-2 py-0.5 text-[11px] font-bold uppercase text-red-700">Anulada</span>}
                     </span>
                     <span className="mt-1 flex flex-wrap gap-1.5">

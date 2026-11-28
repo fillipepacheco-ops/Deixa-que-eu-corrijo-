@@ -51,12 +51,74 @@ def anchors_of(p):
     for i, w in enumerate(ws):
         if ANCHOR.match(w["text"]) and "Bold" in w["fontname"] and i + 1 < len(ws):
             n = ws[i + 1]["text"]
-            if n.isdigit() and abs(ws[i + 1]["top"] - w["top"]) < 3 and 91 <= int(n) <= 180:
+            if n.isdigit() and abs(ws[i + 1]["top"] - w["top"]) < 3 and 1 <= int(n) <= 180:
+                if any(im["x0"] - 1 <= w["x0"] and w["x1"] <= im["x1"] + 1 and im["top"] - 1 <= (w["top"] + w["bottom"]) / 2 <= im["bottom"] + 1 for im in p.images):
+                    continue  # escondida por baixo de uma figura
                 out.append({"n": int(n), "x0": w["x0"], "top": w["top"] - 1, "bottom": max(w["bottom"], ws[i + 1]["bottom"]) + 1})
+    # "Texto para as questões 06 a 10": texto-base comum, vira um bloco que entra no começo de cada uma
+    for i, w in enumerate(ws):
+        if w["text"].lower() in ("texto", "textos") and i + 3 < len(ws) and ws[i + 1]["text"].lower() == "para":
+            row = [x for x in ws if abs(x["top"] - w["top"]) < 2.5 and x["x0"] >= w["x0"] - 1 and x["x0"] < w["x0"] + 300]
+            row.sort(key=lambda x: x["x0"])
+            line = " ".join(x["text"] for x in row)
+            m = re.match(r"^textos? para as quest[õo]es\s*(?:de\s*)?(\d+)\s*(?:a|e|até)\s*(\d+)", line, re.I)
+            if m:
+                a_, b_ = int(m.group(1)), int(m.group(2))
+                out.append({"n": None, "shared": (a_, b_), "x0": w["x0"], "x1": max(x["x1"] for x in row),
+                            "top": w["top"] - 1, "bottom": max(x["bottom"] for x in row) + 1})
     return out
 
 
 page_anchors = [anchors_of(p) for p in pages]
+
+
+def _visible_anchors():
+    """Descarta âncoras invisíveis (texto escondido no PDF): sem tinta onde estariam."""
+    import tempfile, glob as _g
+    tmp = tempfile.mkdtemp()
+    subprocess.run(["pdftoppm", "-r", "40", "-gray", PDF, f"{tmp}/p"], check=True)
+    files = sorted(_g.glob(f"{tmp}/p-*.pgm"))
+    k = 40 / 72
+    for pi, pa in enumerate(page_anchors):
+        if not pa or pi >= len(files):
+            continue
+        im = Image.open(files[pi])
+        keep = []
+        for a in pa:
+            box = (int(a["x0"] * k), int(a["top"] * k), int((a["x0"] + 50) * k) + 1, int(a["bottom"] * k) + 1)
+            px = list(im.crop(box).getdata()) if hasattr(im, 'getdata') else []
+            if px and sum(1 for v in px if v < 160) / len(px) > 0.03:
+                keep.append(a)
+        page_anchors[pi] = keep
+
+
+_visible_anchors()
+# ordem de leitura + chave de cada questão; 1º dia: 01–05 aparecem duas vezes (inglês e espanhol)
+_W0 = pages[0].width
+DAY = 1 if min((a["n"] for pa in page_anchors for a in pa if a["n"]), default=91) <= 90 else 2
+FIRST, LAST = (1, 90) if DAY == 1 else (91, 180)
+_prev, _reset = None, False
+for _pi, _pa in enumerate(page_anchors):
+    _pa.sort(key=lambda a: (0 if a["x0"] < _W0 / 2 else 1, a["top"]))
+    keep = []
+    for a in _pa:
+        n = a["n"]
+        if n is None:
+            a["key"] = "T%d-%d%s" % (a["shared"][0], a["shared"][1], ("e" if _reset else "i") if DAY == 1 and a["shared"][1] <= 5 else "")
+            keep.append(a)
+            continue
+        ok = (_prev is None and n == FIRST) or (_prev is not None and n == _prev + 1)
+        lang = ""
+        if DAY == 1 and n <= 5:
+            if _prev == 5 and n == 1 and not _reset:
+                ok, _reset = True, True
+            lang = "e" if _reset else "i"
+        if not ok:
+            continue  # âncora fora da sequência (texto escondido, referência a outra questão)
+        a["key"] = f"{n}{lang}"
+        _prev = n
+        keep.append(a)
+    page_anchors[_pi] = keep
 all_anchor_tops = [a["top"] for pa in page_anchors for a in pa]
 all_anchor_x = [a["x0"] for pa in page_anchors for a in pa]
 MARGIN_L = min(all_anchor_x) - 4
@@ -122,9 +184,10 @@ def build_lines(chars, body):
                 break
         else:
             sgroups.append({"base": c["bottom"], "chars": [c]})
-    for G in sgroups:
+    attached = []
+    for _pass in range(2):  # 2ª passada: expoente colado num índice que só entrou na 1ª
+      for G in sgroups:
         rest = []
-        attached = []
         for c in sorted(G["chars"], key=lambda c: c["x0"]):
             cy = (c["top"] + c["bottom"]) / 2
             best = None
@@ -135,20 +198,31 @@ def build_lines(chars, body):
                 x1 = max(k["x1"] for k in L["chars"]) + 4
                 if not (x0 <= c["x0"] <= x1):
                     continue
-                lt = min(k["top"] for k in L["chars"] if k["size"] >= body * 0.85)
-                lo, hi = lt, L["base"] + 2.5
+                bigs = [k for k in L["chars"] if k["size"] >= body * 0.85 and k["text"].strip() and "Bundesbahn" not in k["fontname"]] or [k for k in L["chars"] if k["size"] >= body * 0.85]
+                lt = statistics.median([k["top"] for k in bigs])
+                lbase = statistics.median([k["bottom"] for k in bigs])
+                lo, hi = min(k["top"] for k in bigs), lbase + 2.5
                 d = 0 if lo <= cy <= hi else min(abs(cy - lo), abs(cy - hi))
-                if d < 0.3 and (best is None or d < best[0]):
-                    best = (d, L)
-            # só vale como índice/expoente se houver um caractere normal vizinho (até 3 pt)
-            if best and (any(abs(k["x0"] - c["x1"]) < 3 or abs(c["x0"] - k["x1"]) < 3 for k in best[1]["chars"] if k["size"] >= body * 0.85)
-                         or any(abs(c["x0"] - k["x1"]) < 2.5 for k in attached)):
+                if d >= 0.3:
+                    continue
+                # vizinho imediato na mesma linha (letra normal ou índice já colocado nela)
+                adj = any(abs(k["x0"] - c["x1"]) < 3 or abs(c["x0"] - k["x1"]) < 3 for k in L["chars"] if k is not c)
+                adj = adj or any(abs(c["x0"] - k["x1"]) < 2.5 and k in L["chars"] for k in attached)
+                if not adj:
+                    continue
+                # perto da posição de índice (logo abaixo da base) ou de expoente (logo abaixo do topo)
+                sc = min(abs(c["bottom"] - (lbase + 1.5)), abs(c["top"] - (lt - 1.5)))
+                if best is None or sc < best[0]:
+                    best = (sc, L)
+            if best:
                 best[1]["chars"].append(c)
                 attached.append(c)
             else:
                 rest.append(c)
-        if rest:
-            lines.append({"base": G["base"], "chars": rest, "small": True})
+        G["chars"] = rest
+    for G in sgroups:
+        if G["chars"]:
+            lines.append({"base": G["base"], "chars": G["chars"], "small": True})
     # separa pedaços da mesma linha de base muito afastados (ex.: alternativas em duas colunas)
     split = []
     for L in lines:
@@ -157,7 +231,7 @@ def build_lines(chars, body):
         for c in cs[1:]:
             gap = c["x0"] - max(k["x1"] for k in cur)
             lone = len(cur) == 1 and "Bundesbahn" in cur[0]["fontname"]
-            if gap > max(16, 1.8 * c["size"]) or ("Bundesbahn" in c["fontname"] and gap > 8) or (lone and gap > 1):
+            if gap > max(16, 1.8 * c["size"]) or ("Bundesbahn" in c["fontname"] and gap > 8) or lone:
                 split.append({"base": L["base"], "chars": cur})
                 cur = [c]
             else:
@@ -168,18 +242,33 @@ def build_lines(chars, body):
     for L in lines:
         cs = sorted(L["chars"], key=lambda c: c["x0"])
         base = statistics.median([c["bottom"] for c in cs if c["size"] >= body * 0.85] or [L["base"]])
-        size = statistics.median([c["size"] for c in cs])
+        size = statistics.median([c["size"] for c in cs if c["size"] >= body * 0.85] or [c["size"] for c in cs])
+        def mode_of(c):
+            if c["size"] < size * 0.85:
+                if c["bottom"] > base + 0.8:
+                    return "sub"
+                if c["bottom"] < base - 1.5:
+                    return "sup"
+            return None
+        # índice e expoente empilhados (ex.: A com 10 embaixo e 4 em cima): primeiro o índice, depois o expoente
+        ordered, run = [], []
+        for c in cs:
+            if mode_of(c):
+                run.append(c)
+                continue
+            if run:
+                ordered += sorted(run, key=lambda k: (0 if mode_of(k) == "sub" else 1, k["x0"])) if len({mode_of(k) for k in run}) > 1 else run
+                run = []
+            ordered.append(c)
+        if run:
+            ordered += sorted(run, key=lambda k: (0 if mode_of(k) == "sub" else 1, k["x0"])) if len({mode_of(k) for k in run}) > 1 else run
+        cs = ordered
         txt = ""
         prev = None
         mode = None
         for c in cs:
             ch = c["text"]
-            m = None
-            if c["size"] < size * 0.85:
-                if c["bottom"] > base + 0.8:
-                    m = "sub"
-                elif c["bottom"] < base - 1.5:
-                    m = "sup"
+            m = mode_of(c)
             if prev is not None:
                 gap = c["x0"] - prev["x1"]
                 if gap > min(c["size"], prev["size"]) * 0.18 and not txt.endswith(" ") and ch != " ":
@@ -200,7 +289,7 @@ def build_lines(chars, body):
         txt = txt.replace("ﬁ", "fi").replace("ﬂ", "fl").replace("ﬀ", "ff").replace("\u00ad", "")
         txt = re.sub(r"\s+", " ", txt).strip()
         txt = re.sub(r"(ffi|ffl|fi|fl|ff) (?=[a-zà-ÿ])", r"\1", txt)
-        if re.match(r"^(MATEM[ÁA]TICA|CI[ÊE]NCIAS DA NATUREZA) E SUAS TECNOLOGIAS|^Quest[õo]es de \d+ a \d+", txt):
+        if re.match(r"^(MATEM[ÁA]TICA|CI[ÊE]NCIAS DA NATUREZA|CI[ÊE]NCIAS HUMANAS|LINGUAGENS, C[ÓO]DIGOS) E SUAS TECNOLOGIAS|^LINGUAGENS, C[ÓO]DIGOS$|^E SUAS TECNOLOGIAS$|^Quest[õo]es de \d+ a \d+", txt):
             continue  # cabeçalho de seção
         if not txt:
             continue
@@ -254,11 +343,13 @@ _page_img = {}
 
 def page_image(pi):
     if pi not in _page_img:
-        base = f"/tmp/enem_pages/{YEAR}"
+        base = f"/tmp/enem_pages/{os.path.basename(OUT.rstrip("/"))}_{YEAR}"
         os.makedirs(base, exist_ok=True)
         fn = f"{base}/p{pi+1:02d}.png"
         if not os.path.exists(fn):
             subprocess.run(["pdftoppm", "-f", str(pi + 1), "-l", str(pi + 1), "-r", str(DPI), "-png", "-singlefile", PDF, fn[:-4]], check=True)
+        if len(_page_img) >= 4:
+            _page_img.pop(next(iter(_page_img)))
         _page_img[pi] = Image.open(fn).convert("RGB")
     return _page_img[pi]
 
@@ -269,8 +360,10 @@ _integ = {}
 def integ(pi):
     if pi not in _integ:
         import numpy as np
+        if len(_integ) >= 3:
+            _integ.pop(next(iter(_integ)))
         a = np.asarray(page_image(pi).convert("L"), dtype=np.uint8) < 200
-        _integ[pi] = np.pad(a.cumsum(0).cumsum(1), ((1, 0), (1, 0))).astype(np.int64)
+        _integ[pi] = np.pad(a.astype(np.int32).cumsum(0).cumsum(1), ((1, 0), (1, 0)))
     return _integ[pi]
 
 
@@ -308,6 +401,7 @@ segments = []  # (page_index, col, top, bottom, qn)
 current = None
 items_by_q = {}
 
+seenE = {}
 for pi, p in enumerate(pages):
     anchors = page_anchors[pi]
     if not anchors and current is None:
@@ -352,13 +446,23 @@ for pi, p in enumerate(pages):
         for a in anchors for g in gobjs if g[0] in ("line", "rect", "curve"))
     single = nx >= 3 or (HAS_SEP and not sep and bool(anchors)) or deco
     ncols = 1 if single else 2
+    red = None
+    _ws = p.extract_words()
+    for _i, _w in enumerate(_ws):
+        if _w["text"] in ("REDAÇÃO", "REDAÇAO") and _i >= 1 and _ws[_i - 1]["text"] in ("A", "DE") and abs(_ws[_i - 1]["top"] - _w["top"]) < 3:
+            red = _w
+            break
     for ci in range(ncols):
         x0b, x1b = (MARGIN_L, W - MARGIN_L) if single else col_bounds(ci)
+        ftop_c = ftop
+        red_here = red is not None and (single or col_of(red["x0"], red["x1"]) == ci)
+        if red_here:
+            ftop_c = min(ftop, red["top"] - 3)
         col_anchors = sorted([a for a in anchors if single or col_of(a["x0"], a["x0"] + 40) == ci], key=lambda a: a["top"])
         cchars = [c for c in chars if x0b - 2 <= (c["x0"] + c["x1"]) / 2 <= x1b + 2 and CONTENT_TOP <= c["top"] and c["bottom"] <= ftop]
         # remove os caracteres das âncoras
         def in_anchor(c):
-            return any(a["top"] - 1 <= c["top"] and c["bottom"] <= a["bottom"] + 1 and c["x0"] >= a["x0"] - 1 and c["x0"] < a["x0"] + 90 for a in col_anchors)
+            return any(a["top"] - 1 <= c["top"] and c["bottom"] <= a["bottom"] + 1 and c["x0"] >= a["x0"] - 1 and c["x0"] < a.get("x1", a["x0"] + 90) for a in col_anchors)
         cchars = [c for c in cchars if not in_anchor(c)]
         cg = []
         for g in gobjs:
@@ -375,23 +479,31 @@ for pi, p in enumerate(pages):
             if any(a["top"] - 3 <= (gt + gb) / 2 <= a["bottom"] + 3 and gb - gt < 18 for a in col_anchors):
                 continue
             cg.append(g)
-        bounds = [CONTENT_TOP] + [a["top"] for a in col_anchors] + [ftop]
-        owners = [current] + [a["n"] for a in col_anchors]
+        if red_here:
+            col_anchors = [a for a in col_anchors if a["top"] < ftop_c]
+        bounds = [CONTENT_TOP] + [a["top"] for a in col_anchors] + [ftop_c]
+        owners = [current] + [a["key"] for a in col_anchors]
         for k in range(len(owners)):
             qn = owners[k]
             top = bounds[k] if k == 0 else col_anchors[k - 1]["bottom"]
             bot = bounds[k + 1]
+            if k == 0 and qn is not None and seenE.get(qn):
+                qn = None  # a questão já terminou (alternativa E vista): o que vem antes da próxima âncora não é dela
             if qn is None:
                 continue
             seg = {"page": pi, "col": ci, "top": top, "bottom": bot, "x0": x0b, "x1": x1b, "body": body,
                    "chars": [c for c in cchars if top - 1 <= (c["top"] + c["bottom"]) / 2 < bot],
                    "g": [g for g in cg if top - 1 <= (g[2] + g[4]) / 2 < bot]}
             items_by_q.setdefault(qn, []).append(seg)
+            if any(c["text"] == "E" and "Bundesbahn" in c["fontname"] for c in seg["chars"]):
+                seenE[qn] = True
         if col_anchors:
-            current = col_anchors[-1]["n"]
-        if current == 180 and not col_anchors:
+            current = col_anchors[-1]["key"]
+        if red_here:
+            current = None  # a proposta de redação não entra em nenhuma questão
+        if current == str(LAST) and not col_anchors:
             current = None
-    if current is None and any(a["n"] == 180 for a in anchors):
+    if current is None and any(a.get("n") == LAST for a in anchors):
         break
 
 def crop(pi, box, name):
@@ -540,6 +652,13 @@ def figure_boxes(seg, lines):
         if "(cid:" in l["text"]:
             l["fig"] = True
             g.append([l["x0"], l["top"], l["x1"], l["bottom"]])
+    header_boxes = []
+    for x in seg["g"]:
+        hb = x[1:]
+        if hb[3] - hb[1] < 40 and hb[2] - hb[0] > 60:
+            inside = "".join(c["text"] for c in sorted(seg["chars"], key=lambda c: (round(c["top"]), c["x0"])) if hb[0] - 1 <= c["x0"] and c["x1"] <= hb[2] + 1 and hb[1] - 1 <= c["top"] and c["bottom"] <= hb[3] + 1)
+            if re.search(r"Quest[õo]es\s*de\s*\d+\s*a\s*\d+|E\s*SUAS\s*TECNOLOGIAS", inside):
+                header_boxes.append(hb)
     for x in seg["g"]:
         b = list(x[1:])
         b[1] = max(b[1], seg["top"])
@@ -548,6 +667,8 @@ def figure_boxes(seg, lines):
         if x[0] in ("line", "rect") and b[2] - b[0] < 8 and b[3] - b[1] < 2 and any(
                 l["x0"] - 1 <= b[0] and b[2] <= l["x1"] + 1 and l["top"] - 1 <= b[1] and b[3] <= l["bottom"] + 2 for l in lines):
             continue  # traço de º/ª ou acento desenhado
+        if any(hb[0] - 2 <= b[0] and b[2] <= hb[2] + 2 and hb[1] - 2 <= b[1] and b[3] <= hb[3] + 2 for hb in header_boxes):
+            continue  # faixa de título de seção
         if any(m["x0"] - 4 <= b[0] and b[2] <= m["x1"] + 4 and m["top"] - 4 <= b[1] and b[3] <= m["bottom"] + 4 for m in lines if is_alt_marker(m)):
             continue  # bolinha do marcador da alternativa
         if x[0] == "img":
@@ -673,7 +794,7 @@ def figure_boxes(seg, lines):
 def owner_of(marks, x, y):
     best = None
     for m in marks:
-        if m["top"] - 3 <= y and m["x0"] - 6 <= x:
+        if m["line"]["bottom"] - 2.5 <= y and m["x0"] - 6 <= x:
             k = (round(m["top"] / 4), m["x0"])
             if best is None or k > best[0]:
                 best = (k, m)
@@ -682,7 +803,7 @@ def owner_of(marks, x, y):
 
 corpus_words = set()
 questions = {}
-for qn, segs in sorted(items_by_q.items()):
+for qn, segs in items_by_q.items():
     seq = []  # (kind, el, seg, owner)
     last_label = None
     for seg in segs:
@@ -702,7 +823,7 @@ for qn, segs in sorted(items_by_q.items()):
             if is_alt_marker(l):
                 els.append(("mark", l, l["text"][0], l["top"], l["x0"]))
                 continue
-            o = owner_of(marks, l["x0"], (l["top"] + l["bottom"]) / 2) or last_label
+            o = owner_of(marks, l["x0"], l["bottom"]) or last_label
             els.append(("line", l, o, l["top"], l["x0"]))
         for f in figs:
             cy = (f[1] + f[3]) / 2
@@ -760,7 +881,7 @@ def join_lines(prev, nxt):
 
 
 out = []
-for qn, seq in sorted(questions.items()):
+for qn, seq in questions.items():
     statement = []
     opts = {}
     order = []
@@ -800,7 +921,9 @@ for qn, seq in sorted(questions.items()):
         if kind == "fig":
             flush()
             imgk += 1
-            info = crop(seg["page"], el, f"q{qn:03d}-{imgk}.png")
+            m_ = re.match(r"(\d+)(\w?)", qn)
+            nm = f"q{int(m_.group(1)):03d}{m_.group(2)}" if m_ else "texto" + qn[1:]
+            info = crop(seg["page"], el, f"{nm}-{imgk}.png")
             blocks_of(owner).append({"t": "img", **info})
             last = None
             continue
@@ -838,11 +961,23 @@ for qn, seq in sorted(questions.items()):
         last = l
     flush()
     options = [{"label": o, "blocks": opts[o]} for o in sorted(order)]
-    if qn == 180 and len(options) == 5:
+    if qn == str(LAST) and len(options) == 5:
         # depois da última questão vem o fim do caderno: a alternativa E fica com o mesmo formato da D
         shape = [b["t"] for b in options[3]["blocks"]]
         options[4]["blocks"] = options[4]["blocks"][: len(shape)]
-    out.append({"number": qn, "statement": statement, "options": options})
+    m_ = re.match(r"(\d+)(\w?)", qn)
+    out.append({"number": int(m_.group(1)) if m_ else 0, "lang": (m_.group(2) or None) if m_ else None, "key": qn, "statement": statement, "options": options})
 
+# texto-base comum: entra no começo do enunciado de cada questão do intervalo
+shared = [q for q in out if q["key"].startswith("T")]
+out = [q for q in out if not q["key"].startswith("T")]
+for sq in shared:
+    m_ = re.match(r"T(\d+)-(\d+)(\w?)", sq["key"])
+    lo_, hi_, lg = int(m_.group(1)), int(m_.group(2)), m_.group(3) or None
+    blocks = sq["statement"] + [b for o in sq["options"] for b in o["blocks"]]
+    for q in out:
+        if lo_ <= q["number"] <= hi_ and (q.get("lang") == lg or q["number"] > 5):
+            q["statement"] = blocks + q["statement"]
+            q["shared"] = f"{lo_}-{hi_}"
 json.dump(out, open(os.path.join(OUT, f"{YEAR}.json"), "w"), ensure_ascii=False, indent=1)
-print(YEAR, len(out), "questões;", sum(1 for q in out if len(q["options"]) != 5), "sem 5 alternativas:", [q["number"] for q in out if len(q["options"]) != 5])
+print(YEAR, len(out), "questões;", sum(1 for q in out if len(q["options"]) != 5), "sem 5 alternativas:", [q["key"] for q in out if len(q["options"]) != 5])

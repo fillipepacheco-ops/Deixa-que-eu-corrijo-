@@ -41,7 +41,8 @@ export function BankFilters({
     router.push(`/banco-de-questoes${sp.size ? `?${sp}` : ""}`);
   };
 
-  const discs = taxonomy.filter((d) => (counts[d.d] ?? 0) > 0 && (!values.area || (values.area.startsWith("Matem") ? d.d === "Matemática" : d.d !== "Matemática")));
+  // os números já vêm do recorte por ano/área: só aparecem disciplinas com questões nele
+  const discs = taxonomy.filter((d) => (counts[d.d] ?? 0) > 0);
   const disc = taxonomy.find((d) => d.d === values.d);
   const topics = (disc?.topics ?? []).filter((t) => (counts[`${disc!.d}|${t.t}`] ?? 0) > 0);
   const topic = disc?.topics.find((t) => t.t === values.t);
@@ -63,7 +64,7 @@ export function BankFilters({
             className="field pl-9!"
             value={q}
             onChange={(e) => setQ(e.target.value)}
-            placeholder="Palavra ou nº e ano (ex.: 2025 101, progressão)"
+            placeholder="Palavra ou nº e ano (ex.: 2025 101, 2024 3 inglês, barroco)"
             enterKeyHint="search"
           />
         </div>

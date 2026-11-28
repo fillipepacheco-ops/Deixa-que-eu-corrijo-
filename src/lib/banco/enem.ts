@@ -1,5 +1,6 @@
 /**
- * BANCO DE QUESTÕES — ENEM (2º dia, caderno amarelo: Ciências da Natureza e Matemática).
+ * BANCO DE QUESTÕES — ENEM: 1º dia (Linguagens e Ciências Humanas) e 2º dia
+ * (Ciências da Natureza e Matemática), caderno amarelo/azul conforme o ano.
  *
  * Questões extraídas das provas oficiais com texto fiel e as figuras recortadas
  * no lugar exato de cada uma ([[img:...]]), gabarito oficial e classificação
@@ -28,6 +29,8 @@ export interface BankQuestion {
   /** gabarito oficial (null = anulada) */
   ans: string | null;
   nul: boolean;
+  /** questões 1–5 do 1º dia: língua estrangeira escolhida (i = inglês, e = espanhol) */
+  lang?: "i" | "e";
 }
 
 export interface TaxDiscipline {
@@ -35,10 +38,15 @@ export interface TaxDiscipline {
   topics: { t: string; subs: string[] }[];
 }
 
-export const ENEM_QUESTIONS = data as unknown as BankQuestion[];
+const LANG_ORDER = { i: 0, e: 1 } as const;
+export const ENEM_QUESTIONS = (data as unknown as BankQuestion[])
+  .slice()
+  .sort((a, b) => b.y - a.y || a.n - b.n || (a.lang ? LANG_ORDER[a.lang] : 0) - (b.lang ? LANG_ORDER[b.lang] : 0));
 export const TAXONOMY = tax as unknown as TaxDiscipline[];
 export const ENEM_YEARS = [...new Set(ENEM_QUESTIONS.map((q) => q.y))].sort((a, b) => b - a);
-export const ENEM_AREAS = [...new Set(ENEM_QUESTIONS.map((q) => q.area))];
+const AREA_ORDER = ["Linguagens", "Ciências Humanas", "Ciências da Natureza", "Matemática"];
+const areaRank = (a: string) => AREA_ORDER.findIndex((p) => a.startsWith(p));
+export const ENEM_AREAS = [...new Set(ENEM_QUESTIONS.map((q) => q.area))].sort((a, b) => areaRank(a) - areaRank(b));
 
 export interface BankFilter {
   ano?: number | null;
@@ -72,21 +80,32 @@ function searchable(q: BankQuestion) {
  * Busca pelo número e/ou ano: "2025 101", "101/2025", "questão 150 2019", "ENEM 2022 q95", "135".
  * Só vale quando a busca tem apenas números e essas palavras.
  */
-export function parseLocator(q: string | null | undefined): { ano: number | null; num: number | null } | null {
+export function parseLocator(q: string | null | undefined): { ano: number | null; num: number | null; lang?: "i" | "e" } | null {
   const t = fold(q ?? "").replace(/[^a-z0-9]+/g, " ").trim();
   if (!t || !/\d/.test(t)) return null;
   const toks = t.split(" ").filter((w) => !["enem", "questao", "questoes", "q", "n", "no", "num", "numero", "ano", "de", "do", "da"].includes(w));
   let ano: number | null = null;
   let num: number | null = null;
+  let lang: "i" | "e" | undefined;
   for (const w of toks) {
-    const m = /^q?(\d+)$/.exec(w);
+    if (["ingles", "english"].includes(w)) {
+      lang = "i";
+      continue;
+    }
+    if (["espanhol", "espanol"].includes(w)) {
+      lang = "e";
+      continue;
+    }
+    const m = /^q?(\d+)([ie])?$/.exec(w);
     if (!m) return null;
     const v = Number(m[1]);
+    if (m[2]) lang = m[2] as "i" | "e";
     if (m[1].length === 4 && v >= 2000 && ano === null) ano = v;
     else if (v >= 1 && v <= 180 && num === null) num = v;
     else return null;
   }
-  return ano === null && num === null ? null : { ano, num };
+  if (ano === null && num === null) return null;
+  return lang ? { ano, num, lang } : { ano, num };
 }
 
 export function filterBank(list: BankQuestion[], f: BankFilter): BankQuestion[] {
@@ -100,6 +119,7 @@ export function filterBank(list: BankQuestion[], f: BankFilter): BankQuestion[] 
     if (f.ano && q.y !== f.ano) return false;
     if (loc?.ano && q.y !== loc.ano) return false;
     if (loc?.num && q.n !== loc.num) return false;
+    if (loc?.lang && q.lang !== loc.lang) return false;
     if (f.area && q.area !== f.area) return false;
     if (f.semAnuladas && q.nul) return false;
     if (f.d || f.t || f.s) {
@@ -133,6 +153,17 @@ export function tagCounts(list: BankQuestion[]) {
 export function sourceLabel(q: BankQuestion) {
   return `ENEM ${q.y}`;
 }
+
+/** "Questão 1 (Inglês)", "Questão 46"… */
+export function numberLabel(q: BankQuestion) {
+  return `Questão ${q.n}${q.lang === "i" ? " (Inglês)" : q.lang === "e" ? " (Espanhol)" : ""}`;
+}
+
+/** Total de questões por dia de prova (para os chips da página). */
+export const ENEM_DAY_COUNTS = {
+  d1: ENEM_QUESTIONS.filter((q) => q.n <= 90).length,
+  d2: ENEM_QUESTIONS.filter((q) => q.n > 90).length,
+};
 
 /** Linha de assessment_questions: o enunciado começa com a origem e o ano, ex.: (ENEM 2025). */
 export function bankQuestionRow(q: BankQuestion) {

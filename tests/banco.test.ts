@@ -2,7 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { splitInline, inlineImageSources, stripInline, isAllowedInlineSrc } from "@/lib/assessment/inline-images";
 import { tidyText } from "@/lib/assessment/tidy-text";
-import { ENEM_QUESTIONS, bankQuestionRow, filterBank, tagCounts } from "@/lib/banco/enem";
+import { ENEM_QUESTIONS, bankQuestionRow, filterBank, numberLabel, tagCounts } from "@/lib/banco/enem";
 
 test("separa texto e figuras", () => {
   const s = splitInline("Veja a figura\n[[img:/banco/enem/2025/q101-1.png|62.5]]\nResponda.");
@@ -19,8 +19,9 @@ test("tidyText não junta nem altera a marcação de figura", () => {
   assert.ok(t.endsWith("x^{2} + 1"));
 });
 
-test("banco do ENEM: 810 questões completas, com gabarito e classificação", () => {
-  assert.equal(ENEM_QUESTIONS.length, 810);
+test("banco do ENEM: 1665 questões completas, com gabarito e classificação", () => {
+  assert.equal(ENEM_QUESTIONS.length, 1665);
+  assert.equal(new Set(ENEM_QUESTIONS.map((q) => q.id)).size, 1665);
   for (const q of ENEM_QUESTIONS) {
     assert.equal(q.op.filter((o) => o.trim()).length, 5, q.id);
     assert.ok(q.st.trim(), q.id);
@@ -58,4 +59,17 @@ test("busca pelo número e ano da questão", () => {
   assert.deepEqual(filterBank(ENEM_QUESTIONS, { q: "101/2025" }).map((q) => q.id), ["enem-2025-101"]);
   assert.equal(filterBank(ENEM_QUESTIONS, { q: "135" }).length, 9);
   assert.ok(filterBank(ENEM_QUESTIONS, { q: "2024" }).every((q) => q.y === 2024));
+});
+
+test("1º dia: Linguagens (inglês/espanhol) e Humanas", () => {
+  assert.equal(ENEM_QUESTIONS.filter((q) => q.n <= 90).length, 855);
+  assert.deepEqual(filterBank(ENEM_QUESTIONS, { q: "2025 1" }).map((q) => q.id), ["enem-2025-001i", "enem-2025-001e"]);
+  assert.deepEqual(filterBank(ENEM_QUESTIONS, { q: "2024 3 espanhol" }).map((q) => q.id), ["enem-2024-003e"]);
+  assert.deepEqual(filterBank(ENEM_QUESTIONS, { q: "2023 2i" }).map((q) => q.id), ["enem-2023-002i"]);
+  const h = ENEM_QUESTIONS.find((q) => q.id === "enem-2025-046")!;
+  assert.equal(h.area, "Ciências Humanas e suas Tecnologias");
+  assert.equal(h.ans, "C");
+  assert.ok(bankQuestionRow(h).statement.startsWith("(ENEM 2025)"));
+  assert.equal(numberLabel(ENEM_QUESTIONS.find((q) => q.id === "enem-2025-001i")!), "Questão 1 (Inglês)");
+  assert.ok(filterBank(ENEM_QUESTIONS, { d: "História" }).length > 100);
 });

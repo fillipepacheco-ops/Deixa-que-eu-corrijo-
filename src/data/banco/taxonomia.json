@@ -1,5 +1,373 @@
 [
  {
+  "d": "Língua Portuguesa",
+  "topics": [
+   {
+    "t": "Interpretação e compreensão de texto",
+    "subs": [
+     "Tema e ideia central",
+     "Inferência e informação implícita",
+     "Finalidade e intenção do texto",
+     "Argumentação e ponto de vista",
+     "Humor, ironia e efeitos de sentido"
+    ]
+   },
+   {
+    "t": "Gêneros textuais",
+    "subs": [
+     "Gêneros jornalísticos (notícia, reportagem, artigo, crônica)",
+     "Gêneros publicitários e campanhas",
+     "Gêneros digitais e da internet",
+     "Gêneros instrucionais, científicos e de divulgação",
+     "Charge, tirinha e cartum"
+    ]
+   },
+   {
+    "t": "Variação linguística",
+    "subs": [
+     "Variedades regionais, sociais e históricas",
+     "Norma-padrão e preconceito linguístico",
+     "Oralidade e escrita"
+    ]
+   },
+   {
+    "t": "Funções da linguagem",
+    "subs": [
+     "Funções da linguagem (referencial, emotiva, conativa, metalinguística, poética, fática)"
+    ]
+   },
+   {
+    "t": "Gramática e recursos linguísticos",
+    "subs": [
+     "Coesão e conectivos",
+     "Pontuação, aspas e sinais gráficos",
+     "Classes de palavras e seus efeitos",
+     "Sintaxe, concordância e regência",
+     "Semântica, sinonímia e polissemia",
+     "Formação de palavras e neologismos",
+     "Estrangeirismos e empréstimos"
+    ]
+   },
+   {
+    "t": "Intertextualidade e linguagem figurada",
+    "subs": [
+     "Intertextualidade, paródia e paráfrase",
+     "Figuras de linguagem"
+    ]
+   }
+  ]
+ },
+ {
+  "d": "Literatura",
+  "topics": [
+   {
+    "t": "Escolas literárias",
+    "subs": [
+     "Trovadorismo, Humanismo e Classicismo",
+     "Barroco e Arcadismo",
+     "Romantismo",
+     "Realismo, Naturalismo e Parnasianismo",
+     "Simbolismo e Pré-Modernismo",
+     "Modernismo (1ª, 2ª e 3ª fases)",
+     "Literatura contemporânea"
+    ]
+   },
+   {
+    "t": "Gêneros e elementos literários",
+    "subs": [
+     "Poesia: eu lírico, versificação e recursos",
+     "Prosa: narrador, personagem, tempo e espaço",
+     "Teatro e texto dramático",
+     "Literatura e outras artes"
+    ]
+   },
+   {
+    "t": "Diversidade na literatura",
+    "subs": [
+     "Literatura afro-brasileira e indígena",
+     "Literatura de autoria feminina",
+     "Literatura africana de língua portuguesa",
+     "Literatura de cordel e popular"
+    ]
+   }
+  ]
+ },
+ {
+  "d": "Artes",
+  "topics": [
+   {
+    "t": "Artes visuais",
+    "subs": [
+     "Pintura, escultura e gravura",
+     "Arte contemporânea, instalação e performance",
+     "Fotografia e cinema",
+     "Arquitetura, design e urbanismo",
+     "Vanguardas europeias e Arte Moderna"
+    ]
+   },
+   {
+    "t": "Música, dança e teatro",
+    "subs": [
+     "Música",
+     "Dança",
+     "Teatro e circo"
+    ]
+   },
+   {
+    "t": "Arte e cultura",
+    "subs": [
+     "Patrimônio, arte popular e cultura afro-brasileira e indígena",
+     "Arte e sociedade"
+    ]
+   }
+  ]
+ },
+ {
+  "d": "Educação Física",
+  "topics": [
+   {
+    "t": "Práticas corporais",
+    "subs": [
+     "Esporte e jogos",
+     "Dança, ginástica e lutas",
+     "Corpo, saúde, estética e qualidade de vida",
+     "Esporte, mídia e sociedade"
+    ]
+   }
+  ]
+ },
+ {
+  "d": "Tecnologias da Informação e Comunicação",
+  "topics": [
+   {
+    "t": "Tecnologia e comunicação",
+    "subs": [
+     "Internet, redes sociais e linguagem digital",
+     "Impactos sociais da tecnologia",
+     "Fake news, desinformação e mídia"
+    ]
+   }
+  ]
+ },
+ {
+  "d": "Língua Inglesa",
+  "topics": [
+   {
+    "t": "Compreensão de texto em inglês",
+    "subs": [
+     "Ideia central e finalidade do texto",
+     "Informação específica e vocabulário",
+     "Gêneros: poema, letra de música, quadrinho e charge",
+     "Temas sociais e culturais"
+    ]
+   }
+  ]
+ },
+ {
+  "d": "Língua Espanhola",
+  "topics": [
+   {
+    "t": "Compreensão de texto em espanhol",
+    "subs": [
+     "Ideia central e finalidade do texto",
+     "Informação específica e vocabulário",
+     "Gêneros: poema, letra de música, quadrinho e charge",
+     "Temas sociais e culturais"
+    ]
+   }
+  ]
+ },
+ {
+  "d": "História",
+  "topics": [
+   {
+    "t": "História Antiga e Medieval",
+    "subs": [
+     "Antiguidade Clássica (Grécia e Roma)",
+     "Antiguidade Oriental e outras sociedades",
+     "Idade Média e feudalismo",
+     "Islã e Império Bizantino"
+    ]
+   },
+   {
+    "t": "História Moderna",
+    "subs": [
+     "Renascimento, Reformas e Absolutismo",
+     "Expansão marítima e colonização",
+     "Iluminismo e revoluções (Inglesa, Francesa, Industrial)"
+    ]
+   },
+   {
+    "t": "História Contemporânea",
+    "subs": [
+     "Imperialismo e neocolonialismo",
+     "Primeira Guerra e Revolução Russa",
+     "Totalitarismos e Segunda Guerra",
+     "Guerra Fria e descolonização",
+     "Mundo atual e globalização"
+    ]
+   },
+   {
+    "t": "Brasil Colônia",
+    "subs": [
+     "Economia colonial (açúcar, mineração)",
+     "Escravidão africana e resistência",
+     "Povos indígenas e colonização",
+     "Revoltas e conjurações coloniais"
+    ]
+   },
+   {
+    "t": "Brasil Império",
+    "subs": [
+     "Independência e Primeiro Reinado",
+     "Período Regencial e revoltas",
+     "Segundo Reinado, café e abolição"
+    ]
+   },
+   {
+    "t": "Brasil República",
+    "subs": [
+     "República Velha (Primeira República)",
+     "Era Vargas",
+     "República Populista (1946–1964)",
+     "Ditadura Militar",
+     "Redemocratização e Nova República"
+    ]
+   },
+   {
+    "t": "Temas de História",
+    "subs": [
+     "América pré-colombiana e América Latina",
+     "História da África",
+     "Cidadania, direitos e movimentos sociais",
+     "Trabalho, cultura e cotidiano",
+     "Patrimônio, memória e fontes históricas"
+    ]
+   }
+  ]
+ },
+ {
+  "d": "Geografia",
+  "topics": [
+   {
+    "t": "Geografia física",
+    "subs": [
+     "Clima e fenômenos atmosféricos",
+     "Relevo, solos e geologia",
+     "Hidrografia e recursos hídricos",
+     "Biomas, vegetação e domínios morfoclimáticos"
+    ]
+   },
+   {
+    "t": "Questões ambientais",
+    "subs": [
+     "Impactos ambientais e desenvolvimento sustentável",
+     "Mudanças climáticas e acordos internacionais",
+     "Recursos naturais e energia"
+    ]
+   },
+   {
+    "t": "Geografia humana",
+    "subs": [
+     "População, demografia e migrações",
+     "Urbanização e problemas urbanos",
+     "Espaço agrário e agropecuária",
+     "Indústria e economia",
+     "Transportes e circulação"
+    ]
+   },
+   {
+    "t": "Geopolítica e globalização",
+    "subs": [
+     "Globalização e blocos econômicos",
+     "Conflitos, fronteiras e territórios",
+     "Ordem mundial e geopolítica"
+    ]
+   },
+   {
+    "t": "Cartografia",
+    "subs": [
+     "Mapas, escalas e projeções",
+     "Coordenadas, fusos e orientação"
+    ]
+   },
+   {
+    "t": "Geografia do Brasil",
+    "subs": [
+     "Regionalização e território brasileiro",
+     "Povos tradicionais, quilombolas e indígenas"
+    ]
+   }
+  ]
+ },
+ {
+  "d": "Filosofia",
+  "topics": [
+   {
+    "t": "Filosofia antiga",
+    "subs": [
+     "Pré-socráticos",
+     "Sócrates e Platão",
+     "Aristóteles",
+     "Filosofia helenística"
+    ]
+   },
+   {
+    "t": "Filosofia medieval e moderna",
+    "subs": [
+     "Filosofia medieval (Agostinho, Tomás de Aquino)",
+     "Racionalismo e empirismo (Descartes, Locke, Hume)",
+     "Kant e o Iluminismo",
+     "Contratualistas (Hobbes, Locke, Rousseau)",
+     "Maquiavel e o poder"
+    ]
+   },
+   {
+    "t": "Filosofia contemporânea",
+    "subs": [
+     "Nietzsche, Marx e a crítica da modernidade",
+     "Existencialismo e fenomenologia",
+     "Escola de Frankfurt e indústria cultural",
+     "Filosofia política contemporânea (Arendt, Foucault)"
+    ]
+   },
+   {
+    "t": "Temas de Filosofia",
+    "subs": [
+     "Ética e moral",
+     "Teoria do conhecimento",
+     "Política, poder e Estado",
+     "Estética, linguagem e ciência"
+    ]
+   }
+  ]
+ },
+ {
+  "d": "Sociologia",
+  "topics": [
+   {
+    "t": "Teoria sociológica",
+    "subs": [
+     "Durkheim, Weber e Marx",
+     "Pensamento social brasileiro"
+    ]
+   },
+   {
+    "t": "Temas de Sociologia",
+    "subs": [
+     "Cultura, identidade e diversidade",
+     "Trabalho e sociedade",
+     "Desigualdade, classes e estratificação",
+     "Movimentos sociais e cidadania",
+     "Gênero, raça e minorias",
+     "Violência, controle social e instituições",
+     "Indústria cultural, mídia e consumo",
+     "Religião e sociedade"
+    ]
+   }
+  ]
+ },
+ {
   "d": "Matemática",
   "topics": [
    {
