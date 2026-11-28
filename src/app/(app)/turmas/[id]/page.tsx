@@ -5,7 +5,7 @@ import { ArrowLeft, Trash2 } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { loadSchools } from "@/services/school-context";
 import { deleteClass, updateClass } from "@/services/classes";
-import { addStudent, addStudentsBulk, removeAllStudents, removeStudent, updateStudent } from "@/services/students";
+import { addStudent, addStudentsBulk, removeAllStudents, removeStudent, setStudentActive, updateStudent } from "@/services/students";
 import { StudentListField } from "@/components/students/StudentListField";
 import { StudentRow } from "@/components/students/StudentRow";
 import { Card, EmptyState, PageHeader } from "@/components/ui/PageHeader";
@@ -24,11 +24,13 @@ export default async function TurmaPage({ params }: { params: Promise<{ id: stri
 
   const { data } = await supabase
     .from("students")
-    .select("id, class_id, name, registration, roll_number, active")
+    .select("*")
     .eq("class_id", id)
     .order("roll_number", { ascending: true, nullsFirst: false })
     .order("name");
-  const students = (data ?? []) as Student[];
+  const students = (data ?? []) as (Student & { inactive_reason?: string | null; inactive_since?: string | null })[];
+  const inactiveCount = students.filter((s) => s.active === false).length;
+  const activeCount = students.length - inactiveCount;
 
   return (
     <>
@@ -38,7 +40,14 @@ export default async function TurmaPage({ params }: { params: Promise<{ id: stri
       <PageHeader
         eyebrow={[turma.subject, turma.year].filter(Boolean).join(" · ")}
         title={turma.name}
-        description={[turma.grade_level, turma.shift, `${students.length} ${students.length === 1 ? "aluno" : "alunos"}`].filter(Boolean).join(" · ")}
+        description={[
+          turma.grade_level,
+          turma.shift,
+          `${activeCount} ${activeCount === 1 ? "aluno" : "alunos"}`,
+          inactiveCount ? `${inactiveCount} não ${inactiveCount === 1 ? "frequenta" : "frequentam"} mais` : null,
+        ]
+          .filter(Boolean)
+          .join(" · ")}
         actions={
           <ConfirmButton
             action={deleteClass.bind(null, id)}
@@ -71,7 +80,12 @@ export default async function TurmaPage({ params }: { params: Promise<{ id: stri
             <ul className="divide-y divide-line">
               {students.map((s) => (
                 <li key={s.id}>
-                  <StudentRow student={s} save={updateStudent.bind(null, s.id, id)} remove={removeStudent.bind(null, s.id, id)} />
+                  <StudentRow
+                    student={s}
+                    save={updateStudent.bind(null, s.id, id)}
+                    remove={removeStudent.bind(null, s.id, id)}
+                    setActive={setStudentActive.bind(null, s.id, id)}
+                  />
                 </li>
               ))}
             </ul>

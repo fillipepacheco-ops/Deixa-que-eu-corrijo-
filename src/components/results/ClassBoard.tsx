@@ -22,6 +22,9 @@ export interface ClassBoardStudent {
   name: string;
   roll_number: number | null;
   registration: string | null;
+  /** Não frequenta mais: linha em cinza, em branco no diário. */
+  inactive?: boolean;
+  inactive_reason?: string | null;
 }
 
 export function ClassBoard({
@@ -73,7 +76,7 @@ export function ClassBoard({
   const fmtParam = encodeURIComponent(JSON.stringify(fmt));
   const query = `ids=${chosen.map((a) => a.id).join(",")}&juntar=${combine}&formato=${fmtParam}`;
 
-  const resultColumn = () => columnText(results.map((r) => formatNumber(r.value, fmt)));
+  const resultColumn = () => columnText(results.map((r, i) => (ordered[i].inactive && !chosen.some((a) => a.scores[ordered[i].id] !== undefined) ? "" : formatNumber(r.value, fmt))));
   const fullTable = () =>
     tableText([
       ["Nº", ...(fmt.showRegistration ? ["Matrícula"] : []), "Aluno", ...chosen.map((a) => a.title), resultLabel],
@@ -82,7 +85,7 @@ export function ClassBoard({
         ...(fmt.showRegistration ? [s.registration ?? ""] : []),
         s.name,
         ...chosen.map((a) => (a.scores[s.id] === undefined ? fmt.absent : num(a.scores[s.id]))),
-        formatNumber(results[i].value, fmt),
+        ordered[i].inactive && !chosen.some((a) => a.scores[s.id] !== undefined) ? "" : formatNumber(results[i].value, fmt),
       ]),
     ]);
 
@@ -194,6 +197,23 @@ export function ClassBoard({
               <tbody className="divide-y divide-line">
                 {ordered.map((s, i) => {
                   const r = results[i];
+                  if (s.inactive) {
+                    return (
+                      <tr key={s.id} className="bg-gray-50 text-gray-400">
+                        <td className="px-3 py-2.5 text-right font-bold tabular-nums">{s.roll_number ?? "–"}</td>
+                        <td className="sticky left-0 bg-gray-50 px-3 py-2.5 font-semibold">
+                          <span className="line-through decoration-gray-300">{s.name}</span>
+                          <span className="block text-[11px] font-semibold text-gray-500">Não frequenta mais{s.inactive_reason ? ` · ${s.inactive_reason}` : ""}</span>
+                        </td>
+                        {chosen.map((a) => (
+                          <td key={a.id} className="px-3 py-2.5 text-center tabular-nums">
+                            {a.scores[s.id] === undefined ? "—" : num(a.scores[s.id])}
+                          </td>
+                        ))}
+                        <td className="px-3 py-2 text-center">—</td>
+                      </tr>
+                    );
+                  }
                   const low = !passes(r.value, r.max, fmt);
                   return (
                     <tr key={s.id}>

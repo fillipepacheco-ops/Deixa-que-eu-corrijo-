@@ -38,6 +38,8 @@ export async function saveManualScore(assessmentId: string, studentId: string, s
   const supabase = await createClient();
   const { data: a } = await supabase.from("assessments").select("max_score").eq("id", assessmentId).maybeSingle();
   if (!a) return { ok: false, error: "Avaliação não encontrada." };
+  const { data: st } = await supabase.from("students").select("active").eq("id", studentId).maybeSingle();
+  if (st && st.active === false) return { ok: false, error: "Este aluno não frequenta mais a escola: não dá para lançar nota para ele." };
   const { data: existing } = await supabase
     .from("submissions")
     .select("id, source")

@@ -29,6 +29,9 @@ export interface BoardRow {
   correct: number | null;
   source: string | null;
   proofUrl: string | null;
+  /** Não frequenta mais: linha em cinza, sem lançamento (fica em branco no diário). */
+  inactive?: boolean;
+  inactiveReason?: string | null;
 }
 
 function useLaunched(key: string) {
@@ -76,12 +79,14 @@ export function ResultsBoard({
 
   const ordered = useMemo(() => sortStudents(rows, fmt.order), [rows, fmt.order]);
   const max = diaryMax(maxScore, fmt);
-  const graded = ordered.filter((r) => r.score !== null);
+  const active = ordered.filter((r) => !r.inactive);
+  const graded = active.filter((r) => r.score !== null);
   const values = graded.map((r) => diaryValue(r.score as number, maxScore, fmt));
   const mean = values.length ? values.reduce((a, b) => a + b, 0) / values.length : null;
   const below = values.filter((v) => !passes(v, max, fmt)).length;
   const show = (v: number) => formatNumber(v, fmt);
-  const doneCount = ordered.filter((r) => launched.has(r.id)).length;
+  const doneCount = active.filter((r) => launched.has(r.id)).length;
+  const cell = (r: BoardRow) => (r.inactive && r.score === null ? "" : diaryText(r.score, maxScore, fmt));
   const fmtParam = encodeURIComponent(JSON.stringify(fmt));
 
   function toggle(id: string) {
@@ -91,18 +96,18 @@ export function ResultsBoard({
     setLaunched(next);
   }
 
-  const notesColumn = () => columnText(ordered.map((r) => diaryText(r.score, maxScore, fmt)));
+  const notesColumn = () => columnText(ordered.map(cell));
   const fullTable = () =>
     tableText([
       ["Nº", ...(fmt.showRegistration ? ["Matrícula"] : []), "Aluno", "Nota"],
-      ...ordered.map((r) => [r.roll_number ? String(r.roll_number) : "", ...(fmt.showRegistration ? [r.registration ?? ""] : []), r.name, diaryText(r.score, maxScore, fmt)]),
+      ...ordered.map((r) => [r.roll_number ? String(r.roll_number) : "", ...(fmt.showRegistration ? [r.registration ?? ""] : []), r.name, cell(r)]),
     ]);
 
   return (
     <div className="space-y-5">
       {/* resumo */}
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-        <Stat label="Corrigidas" value={`${graded.length}/${ordered.length}`} />
+        <Stat label="Corrigidas" value={`${graded.length}/${active.length}`} />
         <Stat label="Média da turma" value={mean === null ? "—" : formatRaw(mean, fmt.decimal)} sub={`de ${show(max)}`} />
         <Stat label="Maior · menor" value={values.length ? `${show(Math.max(...values))} · ${show(Math.min(...values))}` : "—"} />
         <Stat label="Abaixo da média" value={String(below)} sub={`média ${fmt.passPercent}% (${show((max * fmt.passPercent) / 100)})`} warn={below > 0} />
@@ -119,7 +124,7 @@ export function ResultsBoard({
               <p className="text-[13px] text-muted">Notas já no formato da escola. Depois de passar a nota de um aluno, toque nele: ele fica marcado ✓.</p>
             </div>
             <span className="rounded-full bg-brand-50 px-3 py-1 text-[13px] font-bold text-brand-800">
-              {doneCount} de {ordered.length} lançados
+              {doneCount} de {active.length} lançados
             </span>
           </div>
           <div className="grid gap-2.5 sm:grid-cols-2">
@@ -151,6 +156,23 @@ export function ResultsBoard({
 
         <ul className="divide-y divide-line border-t border-line">
           {ordered.map((r) => {
+            if (r.inactive) {
+              return (
+                <li key={r.id} className="bg-gray-50">
+                  <div className="flex items-center gap-3 px-4 py-3 select-none sm:px-5" title="Não frequenta mais: sem lançamento">
+                    <Circle size={24} className="shrink-0 text-gray-200" />
+                    <span className="w-7 shrink-0 text-right text-[14px] font-bold tabular-nums text-gray-300">{r.roll_number ?? "–"}</span>
+                    <span className="min-w-0 flex-1">
+                      <span className="block truncate text-[15px] font-semibold text-gray-400 line-through decoration-gray-300">{r.name}</span>
+                      <span className="text-[12px] font-semibold text-gray-500">Não frequenta mais{r.inactiveReason ? ` · ${r.inactiveReason}` : ""}</span>
+                    </span>
+                    <span className="min-w-14 shrink-0 rounded-xl bg-gray-100 px-2.5 py-1.5 text-center text-[16px] font-bold text-gray-400">
+                      {r.score === null ? "—" : diaryText(r.score, maxScore, fmt)}
+                    </span>
+                  </div>
+                </li>
+              );
+            }
             const done = launched.has(r.id);
             const value = r.score === null ? null : diaryValue(r.score, maxScore, fmt);
             const low = value !== null && !passes(value, max, fmt);
@@ -219,7 +241,7 @@ export function ResultsBoard({
             );
           })}
         </ul>
-        {graded.length < ordered.length && (
+        {graded.length < active.length && (
           <div className="border-t border-line p-4 sm:p-5">
             <Link href={`/correcao/${assessmentId}`} className="inline-flex items-center gap-2 rounded-xl bg-brand-900 px-4 py-3 text-[14px] font-bold text-white active:scale-[0.98]">
               <Camera size={18} /> Corrigir os que faltam pela câmera

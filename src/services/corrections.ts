@@ -32,6 +32,8 @@ export async function saveCorrection(assessmentId: string, input: SaveCorrection
     annulPolicy: data.assessment.annul_policy,
   });
   if (grade.needsReview) return { ok: false, error: "Ainda há questão com leitura incerta. Escolha a resposta antes de salvar." };
+  const { data: st } = await supabase.from("students").select("active").eq("id", input.studentId).maybeSingle();
+  if (st && st.active === false) return { ok: false, error: "Este aluno não frequenta mais a escola: não dá para lançar nota para ele." };
 
   let answerSheetId: string | null = null;
   if (input.sheetNumber !== null) {

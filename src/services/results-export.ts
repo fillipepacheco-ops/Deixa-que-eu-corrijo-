@@ -22,12 +22,12 @@ export async function exportAssessment(supabase: SupabaseClient, id: string, kin
   const rows = sortStudents(res.rows, fmt.order);
   const max = diaryMax(a.max_score, fmt);
   const head = ["Nº", ...(fmt.showRegistration ? ["Matrícula"] : []), "Aluno", `Nota (0 a ${formatNumber(max, { step: max % 1 ? 0.1 : 1, decimal: fmt.decimal })})`];
-  const body = rows.map((r) => [r.roll_number ? String(r.roll_number) : "", ...(fmt.showRegistration ? [r.registration ?? ""] : []), r.name, diaryText(r.score, a.max_score, fmt)]);
+  const body = rows.map((r) => [r.roll_number ? String(r.roll_number) : "", ...(fmt.showRegistration ? [r.registration ?? ""] : []), r.inactive ? `${r.name} (não frequenta)` : r.name, r.inactive && r.score === null ? "" : diaryText(r.score, a.max_score, fmt)]);
   const base = fileSlug(`notas ${a.title} ${a.class_name ?? ""}`);
 
   if (kind === "planilha") return { bytes: enc(toCsv([head, ...body])), filename: `${base}.csv`, mime: "text/csv" };
 
-  const graded = rows.filter((r) => r.score !== null);
+  const graded = rows.filter((r) => r.score !== null && !r.inactive);
   const values = graded.map((r) => diaryValue(r.score as number, a.max_score, fmt));
   const mean = values.length ? values.reduce((x, y) => x + y, 0) / values.length : null;
   const below = graded.filter((r) => !passes(diaryValue(r.score as number, a.max_score, fmt), max, fmt)).length;
@@ -45,7 +45,7 @@ export async function exportAssessment(supabase: SupabaseClient, id: string, kin
     rows: body,
     highlight: rows.map((r) => r.score !== null && !passes(diaryValue(r.score, a.max_score, fmt), max, fmt)),
     notes: [
-      `Corrigidas: ${graded.length} de ${rows.length}` + (mean !== null ? ` · Média da turma: ${formatNumber(Math.round(mean * 100) / 100, { step: 0.01, decimal: fmt.decimal })}` : ""),
+      `Corrigidas: ${graded.length} de ${rows.filter((r) => !r.inactive).length}` + (mean !== null ? ` · Média da turma: ${formatNumber(Math.round(mean * 100) / 100, { step: 0.01, decimal: fmt.decimal })}` : ""),
       `Abaixo da média (${fmt.passPercent}%): ${below} aluno(s), em destaque.` + (fmt.absent ? ` · "${fmt.absent}" = não fez a prova.` : ""),
     ],
   });
@@ -79,9 +79,9 @@ export async function exportClass(
     return [
       s.roll_number ? String(s.roll_number) : "",
       ...(fmt.showRegistration ? [s.registration ?? ""] : []),
-      s.name,
-      ...items.map((i) => (i.score === null ? fmt.absent : formatRaw(i.score, fmt.decimal))),
-      formatNumber(total.value, fmt),
+      s.inactive ? `${s.name} (não frequenta)` : s.name,
+      ...items.map((i) => (i.score === null ? (s.inactive ? "" : fmt.absent) : formatRaw(i.score, fmt.decimal))),
+      s.inactive && items.every((i) => i.score === null) ? "" : formatNumber(total.value, fmt),
     ];
   });
   const base = fileSlug(`notas turma ${res.className}`);

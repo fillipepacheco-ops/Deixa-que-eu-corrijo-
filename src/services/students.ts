@@ -56,6 +56,22 @@ export async function updateStudent(id: string, classId: string, _: FormState, f
   return { ok: true };
 }
 
+
+/** Hibernar / reativar: o aluno fica na lista (em cinza), mas não recebe prova, cartão nem nota. */
+export async function setStudentActive(id: string, classId: string, active: boolean, reason?: string) {
+  const supabase = await createClient();
+  const today = new Intl.DateTimeFormat("en-CA", { timeZone: "America/Sao_Paulo" }).format(new Date());
+  let { error } = await supabase
+    .from("students")
+    .update(active ? { active: true, inactive_reason: null, inactive_since: null } : { active: false, inactive_reason: (reason || "Não frequenta mais").slice(0, 60), inactive_since: today })
+    .eq("id", id);
+  // banco sem a atualização 0017: guarda só o "ativo"
+  if (error && /inactive_/.test(error.message)) ({ error } = await supabase.from("students").update({ active }).eq("id", id));
+  if (error) throw new Error(error.message);
+  await supabase.from("audit_log").insert({ entity: "student", entity_id: id, action: active ? "reactivate" : "deactivate" });
+  refresh(classId);
+}
+
 /** Apaga todos os alunos da turma (ex.: importação que saiu errada). */
 export async function removeAllStudents(classId: string) {
   const supabase = await createClient();

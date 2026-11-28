@@ -12,6 +12,9 @@ export interface ResultStudent {
   name: string;
   roll_number: number | null;
   registration: string | null;
+  /** Não frequenta mais (transferido etc.): aparece em cinza, sem lançamento. */
+  inactive?: boolean;
+  inactive_reason?: string | null;
 }
 
 export interface ResultRow extends ResultStudent {
@@ -35,8 +38,16 @@ export function formatFor(map: Map<string, DiaryFormat>, school: string | null |
 
 export async function loadClassStudents(supabase: SupabaseClient, classId: string | null): Promise<ResultStudent[]> {
   if (!classId) return [];
-  const { data } = await supabase.from("students").select("id, name, roll_number, registration").eq("class_id", classId).eq("active", true);
-  return (data ?? []) as ResultStudent[];
+  // inclui quem não frequenta mais: a linha dele continua no lugar (o diário também tem), em branco
+  const { data } = await supabase.from("students").select("*").eq("class_id", classId);
+  return ((data ?? []) as (ResultStudent & { active?: boolean; inactive_reason?: string | null })[]).map((s) => ({
+    id: s.id,
+    name: s.name,
+    roll_number: s.roll_number,
+    registration: s.registration,
+    inactive: s.active === false,
+    inactive_reason: s.inactive_reason ?? null,
+  }));
 }
 
 /**
@@ -103,7 +114,7 @@ export async function loadAssessmentResults(supabase: SupabaseClient, id: string
     format,
     formatsReady: formats.ready,
     rows,
-    summary: summarizeScores(rows.filter((r) => r.score !== null).map((r) => r.score as number)),
+    summary: summarizeScores(rows.filter((r) => r.score !== null && !r.inactive).map((r) => r.score as number)),
     analysis,
     regraded: fixes.length,
   };

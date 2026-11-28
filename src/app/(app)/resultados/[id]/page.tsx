@@ -30,6 +30,8 @@ export default async function ResultadoPage({ params }: { params: Promise<{ id: 
     correct: r.correct,
     source: r.source,
     proofUrl: r.proofPath ? (urlOf.get(r.proofPath) ?? null) : null,
+    inactive: !!r.inactive,
+    inactiveReason: r.inactive_reason ?? null,
   }));
 
   return (
