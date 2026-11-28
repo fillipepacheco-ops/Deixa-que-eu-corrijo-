@@ -203,7 +203,7 @@ export default async function SlotPage({ params }: { params: Promise<{ slotId: s
       {results !== null && (
         <section className="mt-10">
           <h2 className="mb-1 flex items-center gap-2 text-[20px] font-extrabold text-brand-900">
-            <BarChart3 size={20} /> Notas de {slot.discipline}
+            <BarChart3 size={20} /> Resultados da prova
           </h2>
           <p className="mb-4 text-[14px] text-muted">
             Só as suas questões contam. A coordenação corrige os cartões uma vez e a nota de cada disciplina aparece aqui para o professor lançar no diário —
