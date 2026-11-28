@@ -12,8 +12,8 @@ test("planilha com cabeçalho (Excel/CSV)", () => {
     ["", "", ""],
   ];
   const out = rosterFromRows(rows);
-  assert.deepEqual(out, ["1;Ana Beatriz de Souza;2023001", "2;João Pedro Lima;2023002"]);
-  assert.deepEqual(parseStudentList(out.join("\n"))[0], { name: "Ana Beatriz de Souza", roll_number: 1, registration: "2023001" });
+  assert.deepEqual(out, ["1;Ana Beatriz de Souza", "2;João Pedro Lima"]);
+  assert.deepEqual(parseStudentList(out.join("\n"))[0], { name: "Ana Beatriz de Souza", roll_number: 1, registration: null });
 });
 
 test("planilha sem cabeçalho", () => {
@@ -29,7 +29,7 @@ test("texto de PDF/Word: tira cabeçalhos e separa nº e matrícula", () => {
     "Maria Clara Alves",
     "Página 1 de 2",
   ]);
-  assert.deepEqual(out, ["1;Ana Beatriz Souza;2023001", "2;João Pedro Lima", "Maria Clara Alves"]);
+  assert.deepEqual(out, ["1;Ana Beatriz Souza", "2;João Pedro Lima", "Maria Clara Alves"]);
   assert.deepEqual(parseStudentList(out.join("\n")).map((s) => s.name), ["Ana Beatriz Souza", "João Pedro Lima", "Maria Clara Alves"]);
 });
 
@@ -37,4 +37,10 @@ test("CSV com ; e aspas; nomes", () => {
   assert.deepEqual(parseCsv('nome;matricula\n"Silva, Ana";123\n'), [["nome", "matricula"], ["Silva, Ana", "123"]]);
   assert.equal(tidyName("MARIA DAS DORES DOS SANTOS"), "Maria das Dores dos Santos");
   assert.equal(tidyName("Ana McDonald"), "Ana McDonald");
+});
+
+test("leitura estranha (mesmo nome repetido) vira aviso; 'Do Es' não é nome", async () => {
+  const { finishRoster } = await import("../src/lib/students/roster");
+  assert.throws(() => finishRoster(Array.from({ length: 10 }, () => "Do Es")));
+  assert.deepEqual(rosterFromLines(["Do Es", "1 Do Es"]), []);
 });

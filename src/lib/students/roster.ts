@@ -13,7 +13,19 @@ const NOISE = /\b(lista|turma|escola|professor|professora|disciplina|bimestre|se
 const clean = (s: string) => s.replace(/\s+/g, " ").trim();
 const letterWords = (s: string) => (s.match(/[A-Za-zÀ-ÿ]{2,}/g) ?? []).length;
 const isRoll = (s: string) => /^\d{1,3}[º°.]?$/.test(s.trim());
-const isNameLike = (s: string) => letterWords(s) >= 2 && !/\d{3,}/.test(s) && !NOISE.test(s) && !/@/.test(s);
+/** Nome completo: pelo menos 2 palavras, uma delas com 3+ letras e 5+ letras no total. */
+const isNameLike = (s: string) => {
+  const words = s.match(/[A-Za-zÀ-ÿ]{2,}/g) ?? [];
+  return (
+    words.length >= 2 &&
+    words.some((w) => w.length >= 3) &&
+    words.join("").length >= 5 &&
+    !/\d{3,}/.test(s) &&
+    !NOISE.test(s) &&
+    !NAME_HEADER.test(s.split(" ")[0] ?? "") &&
+    !/@/.test(s)
+  );
+};
 
 /** Nome em maiúsculas → "Ana Beatriz de Souza" (mantém como está se já vier misturado). */
 export function tidyName(s: string): string {
@@ -27,13 +39,30 @@ export function tidyName(s: string): string {
     .join(" ");
 }
 
-/** No formato que a caixa "Colar lista" entende: "nº;nome;matrícula", "nº;nome", "nome;matrícula" ou "nome". */
-const line = (roll: string | null, name: string, reg: string | null) => {
+/** Só o que importa: nº de chamada e nome completo ("12;Nome" ou "Nome"). */
+const line = (roll: string | null, name: string, _reg?: string | null) => {
+  void _reg;
   const n = tidyName(name);
   const r = roll ? String(Number(roll.replace(/\D/g, ""))) : null;
-  const m = reg ? clean(reg) : null;
-  return [r, n, m].filter(Boolean).join(";");
+  return [r, n].filter(Boolean).join(";");
 };
+
+/** Tira repetidos e desconfia de leituras estranhas (o mesmo "nome" em várias linhas). */
+export function finishRoster(lines: string[]): string[] {
+  const seen = new Set<string>();
+  const out = lines.filter((l) => {
+    const k = l.toLowerCase();
+    if (seen.has(k)) return false;
+    seen.add(k);
+    return true;
+  });
+  const names = lines.map((l) => l.replace(/^\d+;/, "").toLowerCase());
+  const top = Math.max(0, ...[...new Set(names)].map((n) => names.filter((x) => x === n).length));
+  if (lines.length >= 5 && top > lines.length / 3) {
+    throw new Error("Não consegui ler os nomes deste arquivo direito. Me mande o arquivo para eu ajustar a leitura, ou cole os nomes na caixa.");
+  }
+  return out;
+}
 
 /** Planilha / tabela: acha as colunas de nome, nº e matrícula (pelo cabeçalho ou pelo conteúdo). */
 export function rosterFromRows(rows: string[][]): string[] {
@@ -84,7 +113,7 @@ export function rosterFromRows(rows: string[][]): string[] {
   const out: string[] = [];
   for (const r of body) {
     const name = r[nameCol] ?? "";
-    if (letterWords(name) < 1 || NAME_HEADER.test(name) && name.length < 20 || NOISE.test(name)) continue;
+    if (!isNameLike(name)) continue;
     const roll = rollCol >= 0 && isRoll(r[rollCol] ?? "") ? r[rollCol] : null;
     const reg = regCol >= 0 ? r[regCol] || null : null;
     out.push(line(roll, name, reg));

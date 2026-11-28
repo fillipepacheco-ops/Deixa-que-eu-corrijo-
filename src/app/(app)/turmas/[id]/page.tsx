@@ -5,7 +5,7 @@ import { ArrowLeft, Pencil, Trash2 } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { loadSchools } from "@/services/school-context";
 import { deleteClass, updateClass } from "@/services/classes";
-import { addStudent, addStudentsBulk, removeStudent, updateStudent } from "@/services/students";
+import { addStudent, addStudentsBulk, removeAllStudents, removeStudent, updateStudent } from "@/services/students";
 import { StudentListField } from "@/components/students/StudentListField";
 import { Card, EmptyState, PageHeader } from "@/components/ui/PageHeader";
 import { ActionForm } from "@/components/ui/ActionForm";
@@ -52,6 +52,15 @@ export default async function TurmaPage({ params }: { params: Promise<{ id: stri
         <Card>
           <div className="flex items-center justify-between border-b border-line px-5 py-3.5">
             <h2 className="font-bold text-brand-900">Alunos</h2>
+            {students.length > 0 && (
+              <ConfirmButton
+                action={removeAllStudents.bind(null, id)}
+                message={`Apagar os ${students.length} alunos desta turma? Use quando uma importação sair errada. As notas e correções desses alunos também serão apagadas.`}
+                className="px-2.5! py-1! text-[13px]"
+              >
+                <Trash2 size={14} /> Apagar todos
+              </ConfirmButton>
+            )}
           </div>
           {students.length === 0 ? (
             <div className="p-5">

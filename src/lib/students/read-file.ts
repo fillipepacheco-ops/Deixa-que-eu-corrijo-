@@ -3,7 +3,7 @@
  * e devolve as linhas "nº;nome;matrícula" para o professor conferir.
  */
 import JSZip from "jszip";
-import { parseCsv, rosterFromLines, rosterFromRows } from "./roster";
+import { finishRoster, parseCsv, rosterFromLines, rosterFromRows } from "./roster";
 
 const xml = (s: string) => new DOMParser().parseFromString(s, "application/xml");
 const byTag = (el: Document | Element, tag: string) => Array.from(el.getElementsByTagNameNS("*", tag));
@@ -79,6 +79,10 @@ async function readPdf(data: ArrayBuffer): Promise<string[]> {
 }
 
 export async function readRosterFile(file: File): Promise<string[]> {
+  return finishRoster(await readAny(file));
+}
+
+async function readAny(file: File): Promise<string[]> {
   const name = file.name.toLowerCase();
   if (name.endsWith(".xls")) throw new Error("Arquivo .xls (Excel antigo): abra no Excel e salve como .xlsx ou .csv.");
   if (name.endsWith(".doc")) throw new Error("Arquivo .doc (Word antigo): abra no Word e salve como .docx.");

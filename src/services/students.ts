@@ -56,6 +56,14 @@ export async function updateStudent(id: string, classId: string, _: FormState, f
   return { ok: true };
 }
 
+/** Apaga todos os alunos da turma (ex.: importação que saiu errada). */
+export async function removeAllStudents(classId: string) {
+  const supabase = await createClient();
+  await supabase.from("students").delete().eq("class_id", classId);
+  await supabase.from("audit_log").insert({ entity: "class", entity_id: classId, action: "delete_all_students" });
+  refresh(classId);
+}
+
 export async function removeStudent(id: string, classId: string) {
   const supabase = await createClient();
   await supabase.from("students").delete().eq("id", id);
