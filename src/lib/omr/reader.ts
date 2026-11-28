@@ -206,7 +206,7 @@ function meanGrayDisc(img: GrayImage, h: Homography, cx: number, cy: number, r: 
   return sum / n;
 }
 
-export function readAnswerSheet(img: GrayImage, questions: SheetQuestionSpec[], opts: { versions?: number; legacy?: boolean } = {}): ReadResult {
+export function readAnswerSheet(img: GrayImage, questions: SheetQuestionSpec[], opts: { versions?: number; legacy?: boolean; layoutVersion?: number } = {}): ReadResult {
   const empty: ReadResult = { ok: false, sheetNumber: null, rollNumber: null, answers: {}, questions: [], problems: [] };
   const corners = findFiducials(img);
   if (!corners) {

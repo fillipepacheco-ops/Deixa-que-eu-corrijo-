@@ -11,6 +11,7 @@ import type { ReadResult } from "@/lib/omr/reader";
 import { MARKED_MIN } from "@/lib/omr/reader";
 import { buildProof } from "@/lib/correction/proof";
 import { loadImage, readCanvas, toCanvas } from "@/lib/correction/capture";
+import { LAYOUT_VERSION, printedLayout } from "@/lib/answer-sheet/layout";
 import { saveCorrection } from "@/services/corrections";
 import { answersToBase, keyForVersion, versionLabel } from "@/lib/versions/versions";
 
@@ -43,8 +44,8 @@ interface Shot {
   version: number;
   /** De onde veio a versão: pintada pelo aluno, do cartão impresso ou não identificada. */
   versionFrom: "marked" | "card" | "none";
-  /** Cartão impresso no desenho antigo (antes de as questões ocuparem as 4 colunas). */
-  legacy: boolean;
+  /** Desenho com que o cartão foi impresso (os antigos continuam sendo lidos). */
+  layoutVersion: number;
 }
 
 type Banner =
@@ -162,7 +163,7 @@ export function CorrectionStation(props: Props) {
         homography: shot.read.homography!,
         specs,
         key: keyOf(shot.version),
-        legacy: shot.legacy,
+        layoutVersion: shot.layoutVersion,
         answers,
         marked: markedOf(shot.read),
         grade,
@@ -277,14 +278,14 @@ export function CorrectionStation(props: Props) {
       if (!read.ok || !read.homography) return null;
       // cartão impresso antes da mudança de desenho: lê de novo no desenho antigo
       const printed = read.sheetNumber !== null ? props.sheets.find((s) => s.sheet_number === read.sheetNumber) : undefined;
-      const legacy = !!printed && (printed.layout_version ?? 1) < 4;
-      if (legacy) {
-        const again = readCanvas(photo, specs, orders?.length ?? 1, true);
+      const layoutVersion = printed ? printedLayout(printed.layout_version) : LAYOUT_VERSION;
+      if (layoutVersion !== LAYOUT_VERSION) {
+        const again = readCanvas(photo, specs, orders?.length ?? 1, layoutVersion);
         if (again.ok && again.homography) read = again;
       }
       if (read.sheetNumber !== null) recent.current.set(read.sheetNumber, Date.now());
       const v = versionOfRead(read);
-      return { photo, read, version: v.version, versionFrom: v.from, legacy };
+      return { photo, read, version: v.version, versionFrom: v.from, layoutVersion };
     },
     [specs, versionOfRead, orders, props.sheets],
   );

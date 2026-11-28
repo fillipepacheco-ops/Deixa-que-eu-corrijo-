@@ -9,9 +9,13 @@
  */
 import { CODE_TOTAL_BITS } from "./code";
 
-export const LAYOUT_VERSION = 4; // v2: bolhas menores (3,3 mm) · v3: Tipo B · v4: questões espalhadas pelas 4 colunas
+// v2: bolhas menores (3,3 mm) · v3: Tipo B · v4: questões espalhadas pelas 4 colunas
+// v5: agrupadas por tipo — certo/errado à esquerda, múltipla escolha (tipo C) e Tipo B à direita
+export const LAYOUT_VERSION = 5;
 /** Cartões impressos antes da v4 (as questões enchiam a coluna da esquerda primeiro). */
 export const LEGACY_LAYOUT_VERSION = 3;
+/** Desenho com que um cartão foi impresso (o banco guarda; antigos = 1 → v3). */
+export const printedLayout = (v: number | null | undefined) => (!v || v < 4 ? 3 : v === 4 ? 4 : LAYOUT_VERSION);
 const MAX_COLUMNS = 4;
 export const PAGE_W = 210;
 export const PAGE_H = 297;
@@ -173,7 +177,58 @@ export function balancedRows(needs: number[]): number {
   return Math.min(rows, ROWS_PER_COLUMN);
 }
 
-export function sheetLayout(questions: SheetQuestionSpec[], opts: { versions?: number; legacy?: boolean } = {}): SheetLayout {
+type Placement = { pos: Map<number, { col: number; row: number }>; cols: number };
+
+/** v3 / v4: as questões descem pela coluna na ordem, um Tipo B passa inteiro para a próxima coluna. */
+function sequentialPlacement(questions: SheetQuestionSpec[], rowsPerColumn: number): Placement {
+  const pos = new Map<number, { col: number; row: number }>();
+  let col = 0;
+  let row = 0;
+  for (const q of questions) {
+    const need = q.numeric ? NUMERIC_ROWS : 1;
+    if (row + need > rowsPerColumn) {
+      col++;
+      row = 0;
+    }
+    pos.set(q.number, { col, row });
+    row += need;
+  }
+  return { pos, cols: questions.length ? col + 1 : 0 };
+}
+
+/**
+ * v5: agrupadas por tipo, da esquerda para a direita — certo/errado, múltipla escolha e Tipo B —
+ * com colunas da mesma altura sempre que dá. Null se não couber nas 4 colunas.
+ */
+function groupedPlacement(questions: SheetQuestionSpec[]): Placement | null {
+  const byNum = (a: SheetQuestionSpec, b: SheetQuestionSpec) => a.number - b.number;
+  const ce = questions.filter((q) => !q.numeric && q.certoErrado).sort(byNum);
+  const mc = questions.filter((q) => !q.numeric && !q.certoErrado).sort(byNum);
+  const nu = questions.filter((q) => q.numeric).sort(byNum);
+  const heights = nu.length ? [NUMERIC_ROWS, 15, 18, ROWS_PER_COLUMN] : [10, 15, ROWS_PER_COLUMN];
+  for (const h of heights) {
+    const per = Math.max(1, Math.floor(h / NUMERIC_ROWS));
+    const simpleCols = (n: number) => (n ? Math.ceil(n / h) : 0);
+    const total = simpleCols(ce.length) + simpleCols(mc.length) + (nu.length ? Math.ceil(nu.length / per) : 0);
+    if (total > MAX_COLUMNS) continue;
+    const pos = new Map<number, { col: number; row: number }>();
+    let col = 0;
+    for (const group of [ce, mc]) {
+      if (!group.length) continue;
+      const cols = simpleCols(group.length);
+      const rows = Math.ceil(group.length / cols); // colunas equilibradas
+      group.forEach((q, i) => pos.set(q.number, { col: col + Math.floor(i / rows), row: i % rows }));
+      col += cols;
+    }
+    nu.forEach((q, i) => pos.set(q.number, { col: col + Math.floor(i / per), row: (i % per) * NUMERIC_ROWS }));
+    if (nu.length) col += Math.ceil(nu.length / per);
+    return { pos, cols: col };
+  }
+  return null;
+}
+
+export function sheetLayout(questions: SheetQuestionSpec[], opts: { versions?: number; legacy?: boolean; layoutVersion?: number } = {}): SheetLayout {
+  const layoutVersion = opts.legacy ? LEGACY_LAYOUT_VERSION : (opts.layoutVersion ?? LAYOUT_VERSION);
   const units = questions.reduce((n, q) => n + (q.numeric ? NUMERIC_ROWS : 1), 0);
   if (questions.length > MAX_QUESTIONS || units > MAX_QUESTIONS) {
     throw new Error(
@@ -189,32 +244,19 @@ export function sheetLayout(questions: SheetQuestionSpec[], opts: { versions?: n
   const maxLabels = Math.max(0, ...questions.filter((q) => !q.numeric).map((q) => q.labels.length));
   if (maxLabels > MAX_OPTIONS) throw new Error(`Máximo de ${MAX_OPTIONS} alternativas por questão.`);
 
-  // As questões descem pela coluna; um bloco do Tipo B ocupa NUMERIC_ROWS linhas
-  // e passa inteiro para a próxima coluna se não couber.
-  // v4: colunas equilibradas e centralizadas na folha. Legado (v3): enche a coluna da esquerda primeiro.
+  // v3: enche a coluna da esquerda primeiro · v4: colunas equilibradas na ordem
+  // v5: agrupadas por tipo (certo/errado | múltipla escolha | Tipo B); se não couber, cai na v4.
   const needs = questions.map((q) => (q.numeric ? NUMERIC_ROWS : 1));
-  const rowsPerColumn = opts.legacy ? ROWS_PER_COLUMN : balancedRows(needs);
-  let usedCols = 1;
-  {
-    let r = 0;
-    for (const n of needs) {
-      if (r + n > rowsPerColumn) {
-        usedCols++;
-        r = 0;
-      }
-      r += n;
-    }
-  }
-  const gridLeft = opts.legacy ? GRID_LEFT : GRID_LEFT + ((MAX_COLUMNS - Math.min(usedCols, MAX_COLUMNS)) * COLUMN_PITCH) / 2;
-  let col = 0;
-  let row = 0;
+  const placement =
+    layoutVersion <= LEGACY_LAYOUT_VERSION
+      ? sequentialPlacement(questions, ROWS_PER_COLUMN)
+      : ((layoutVersion >= 5 ? groupedPlacement(questions) : null) ?? sequentialPlacement(questions, balancedRows(needs)));
+  const usedCols = Math.max(1, placement.cols);
+  const gridLeft =
+    layoutVersion <= LEGACY_LAYOUT_VERSION ? GRID_LEFT : GRID_LEFT + ((MAX_COLUMNS - Math.min(usedCols, MAX_COLUMNS)) * COLUMN_PITCH) / 2;
   const mcColumns = new Set<number>();
   for (const q of questions) {
-    const need = q.numeric ? NUMERIC_ROWS : 1;
-    if (row + need > rowsPerColumn) {
-      col++;
-      row = 0;
-    }
+    const { col, row } = placement.pos.get(q.number)!;
     const baseX = gridLeft + col * COLUMN_PITCH;
     const y = GRID_TOP + row * ROW_PITCH;
     questionLabels.push({ number: q.number, x: baseX, y });
@@ -232,11 +274,8 @@ export function sheetLayout(questions: SheetQuestionSpec[], opts: { versions?: n
         bubbles.push({ question: q.number, label, x: baseX + 9 + j * OPTION_PITCH, y, r: BUBBLE_R, inner: q.certoErrado });
       });
     }
-    row += need;
   }
-  const usedColumns = col + 1;
-
-  const columns = questions.length ? usedColumns : 0;
+  const columns = questions.length ? usedCols : 0;
   // Cabeçalho A–E só para múltipla escolha (certo/errado e Tipo B levam a letra dentro da bolha).
   const mcMax = Math.max(0, ...questions.filter((q) => !q.certoErrado && !q.numeric).map((q) => q.labels.length));
   const headerLabels = "ABCDE".slice(0, mcMax).split("");
@@ -249,7 +288,7 @@ export function sheetLayout(questions: SheetQuestionSpec[], opts: { versions?: n
 
   const { cells, guards } = codeCellsLayout();
   return {
-    version: opts.legacy ? LEGACY_LAYOUT_VERSION : LAYOUT_VERSION,
+    version: layoutVersion,
     fiducials: FIDUCIALS,
     codeCells: cells,
     codeGuards: guards,

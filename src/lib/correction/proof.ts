@@ -29,8 +29,8 @@ export interface ProofInput {
   when: Date;
   /** Logo da escola (já carregada), à esquerda na faixa do comprovante. */
   logo?: (CanvasImageSource & { width: number; height: number }) | null;
-  /** Cartão impresso no desenho antigo (antes da v4). */
-  legacy?: boolean;
+  /** Desenho com que o cartão foi impresso (padrão: o atual). */
+  layoutVersion?: number;
 }
 
 export function buildProof(input: ProofInput): HTMLCanvasElement {
@@ -92,7 +92,7 @@ export function buildProof(input: ProofInput): HTMLCanvasElement {
 
   // ---- foto + marcações ----
   ctx.drawImage(photo, 0, band);
-  const layout = sheetLayout(specs, { legacy: input.legacy });
+  const layout = sheetLayout(specs, { layoutVersion: input.layoutVersion });
   const toPx = (x: number, y: number) => {
     const p = applyHomography(H, { x, y });
     return { x: p.x, y: p.y + band };
