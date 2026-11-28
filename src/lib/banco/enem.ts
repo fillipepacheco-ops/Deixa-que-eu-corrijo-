@@ -68,12 +68,38 @@ function searchable(q: BankQuestion) {
 }
 
 /** Questões que passam no filtro (todas as palavras da busca precisam aparecer). */
+/**
+ * Busca pelo número e/ou ano: "2025 101", "101/2025", "questão 150 2019", "ENEM 2022 q95", "135".
+ * Só vale quando a busca tem apenas números e essas palavras.
+ */
+export function parseLocator(q: string | null | undefined): { ano: number | null; num: number | null } | null {
+  const t = fold(q ?? "").replace(/[^a-z0-9]+/g, " ").trim();
+  if (!t || !/\d/.test(t)) return null;
+  const toks = t.split(" ").filter((w) => !["enem", "questao", "questoes", "q", "n", "no", "num", "numero", "ano", "de", "do", "da"].includes(w));
+  let ano: number | null = null;
+  let num: number | null = null;
+  for (const w of toks) {
+    const m = /^q?(\d+)$/.exec(w);
+    if (!m) return null;
+    const v = Number(m[1]);
+    if (m[1].length === 4 && v >= 2000 && ano === null) ano = v;
+    else if (v >= 1 && v <= 180 && num === null) num = v;
+    else return null;
+  }
+  return ano === null && num === null ? null : { ano, num };
+}
+
 export function filterBank(list: BankQuestion[], f: BankFilter): BankQuestion[] {
-  const words = fold(f.q ?? "")
-    .split(/\s+/)
-    .filter((w) => w.length > 1);
+  const loc = parseLocator(f.q);
+  const words = loc
+    ? []
+    : fold(f.q ?? "")
+        .split(/\s+/)
+        .filter((w) => w.length > 1);
   return list.filter((q) => {
     if (f.ano && q.y !== f.ano) return false;
+    if (loc?.ano && q.y !== loc.ano) return false;
+    if (loc?.num && q.n !== loc.num) return false;
     if (f.area && q.area !== f.area) return false;
     if (f.semAnuladas && q.nul) return false;
     if (f.d || f.t || f.s) {

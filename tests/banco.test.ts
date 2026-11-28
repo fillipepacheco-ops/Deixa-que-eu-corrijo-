@@ -49,3 +49,13 @@ test("filtros: subtópico, ano e busca sem acento", () => {
   const c = tagCounts(ENEM_QUESTIONS);
   assert.ok(c["Matemática"] >= 405);
 });
+
+test("busca pelo número e ano da questão", () => {
+  const one = filterBank(ENEM_QUESTIONS, { q: "2025 101" });
+  assert.deepEqual(one.map((q) => q.id), ["enem-2025-101"]);
+  assert.deepEqual(filterBank(ENEM_QUESTIONS, { q: "questão 150 de 2019" }).map((q) => q.id), ["enem-2019-150"]);
+  assert.deepEqual(filterBank(ENEM_QUESTIONS, { q: "ENEM 2022 q95" }).map((q) => q.id), ["enem-2022-095"]);
+  assert.deepEqual(filterBank(ENEM_QUESTIONS, { q: "101/2025" }).map((q) => q.id), ["enem-2025-101"]);
+  assert.equal(filterBank(ENEM_QUESTIONS, { q: "135" }).length, 9);
+  assert.ok(filterBank(ENEM_QUESTIONS, { q: "2024" }).every((q) => q.y === 2024));
+});

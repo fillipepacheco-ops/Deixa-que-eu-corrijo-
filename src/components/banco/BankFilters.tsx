@@ -63,7 +63,7 @@ export function BankFilters({
             className="field pl-9!"
             value={q}
             onChange={(e) => setQ(e.target.value)}
-            placeholder="Buscar no texto (ex.: progressão, fotossíntese, densidade)"
+            placeholder="Palavra ou nº e ano (ex.: 2025 101, progressão)"
             enterKeyHint="search"
           />
         </div>
