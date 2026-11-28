@@ -76,53 +76,92 @@ export function OptionBadge({ label, size = 44 }: { label: string; size?: number
 }
 
 // ---------- sons (gerados no aparelho, sem arquivos) ----------
-function audio() {
+// O navegador (principalmente no iPad) só deixa tocar som depois de um toque na tela.
+// Por isso há UM contexto de áudio, destravado no primeiro toque e reaproveitado sempre.
+let shared: AudioContext | null = null;
+
+function audio(): AudioContext | null {
+  if (typeof window === "undefined") return null;
+  if (shared && shared.state !== "closed") return shared;
   try {
     const Ctx = window.AudioContext ?? (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
-    return new Ctx();
+    shared = new Ctx();
+    return shared;
   } catch {
     return null;
   }
 }
 
-/** Sirene de ~2,5 s (aluno saiu da tela). */
-export function playSiren() {
+/** Chame num toque/clique: libera o som para o resto da partida. */
+export function unlockAudio() {
   const ctx = audio();
   if (!ctx) return;
-  const o = ctx.createOscillator();
-  const g = ctx.createGain();
-  o.type = "sawtooth";
-  g.gain.value = 0.08;
-  const t = ctx.currentTime;
-  for (let i = 0; i < 5; i++) {
-    o.frequency.setValueAtTime(620, t + i * 0.5);
-    o.frequency.linearRampToValueAtTime(1180, t + i * 0.5 + 0.25);
-    o.frequency.linearRampToValueAtTime(620, t + i * 0.5 + 0.5);
+  if (ctx.state !== "running") ctx.resume().catch(() => {});
+  try {
+    // um "silêncio" curtinho é o que o iOS exige para soltar o áudio
+    const buf = ctx.createBuffer(1, 1, 22050);
+    const src = ctx.createBufferSource();
+    src.buffer = buf;
+    src.connect(ctx.destination);
+    src.start(0);
+  } catch {
+    /* ignora */
   }
-  o.connect(g).connect(ctx.destination);
-  o.start(t);
-  o.stop(t + 2.5);
-  setTimeout(() => ctx.close().catch(() => {}), 3000);
+}
+
+export const audioReady = () => !!shared && shared.state === "running";
+
+/** Toca quando o áudio estiver liberado (tenta liberar antes). */
+function withAudio(play: (ctx: AudioContext) => void) {
+  const ctx = audio();
+  if (!ctx) return;
+  if (ctx.state === "running") play(ctx);
+  else
+    ctx
+      .resume()
+      .then(() => ctx.state === "running" && play(ctx))
+      .catch(() => {});
+}
+
+/** Sirene de ~2,5 s (aluno saiu da tela). */
+export function playSiren() {
+  withAudio((ctx) => {
+    const o = ctx.createOscillator();
+    const g = ctx.createGain();
+    o.type = "sawtooth";
+    const t = ctx.currentTime + 0.02;
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(0.12, t + 0.05);
+    for (let i = 0; i < 5; i++) {
+      o.frequency.setValueAtTime(620, t + i * 0.5);
+      o.frequency.linearRampToValueAtTime(1180, t + i * 0.5 + 0.25);
+      o.frequency.linearRampToValueAtTime(620, t + i * 0.5 + 0.5);
+    }
+    g.gain.setValueAtTime(0.12, t + 2.4);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + 2.5);
+    o.connect(g).connect(ctx.destination);
+    o.start(t);
+    o.stop(t + 2.55);
+  });
 }
 
 /** Fanfarra curta (revelação na cerimônia). */
 export function playFanfare(big = false) {
-  const ctx = audio();
-  if (!ctx) return;
-  const notes = big ? [523, 659, 784, 1047, 784, 1047] : [523, 659, 784];
-  notes.forEach((f, i) => {
-    const o = ctx.createOscillator();
-    const g = ctx.createGain();
-    o.type = "triangle";
-    o.frequency.value = f;
-    const t = ctx.currentTime + i * 0.16;
-    g.gain.setValueAtTime(0.12, t);
-    g.gain.exponentialRampToValueAtTime(0.001, t + (i === notes.length - 1 ? 0.9 : 0.3));
-    o.connect(g).connect(ctx.destination);
-    o.start(t);
-    o.stop(t + 1);
+  withAudio((ctx) => {
+    const notes = big ? [523, 659, 784, 1047, 784, 1047] : [523, 659, 784];
+    notes.forEach((f, i) => {
+      const o = ctx.createOscillator();
+      const g = ctx.createGain();
+      o.type = "triangle";
+      o.frequency.value = f;
+      const t = ctx.currentTime + i * 0.16;
+      g.gain.setValueAtTime(0.12, t);
+      g.gain.exponentialRampToValueAtTime(0.001, t + (i === notes.length - 1 ? 0.9 : 0.3));
+      o.connect(g).connect(ctx.destination);
+      o.start(t);
+      o.stop(t + 1);
+    });
   });
-  setTimeout(() => ctx.close().catch(() => {}), 2500);
 }
 
 /** Sirene no meio do telão e, em seguida, o nome de quem saiu numa bola amarela. */

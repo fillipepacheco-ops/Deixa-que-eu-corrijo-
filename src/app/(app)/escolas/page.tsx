@@ -9,6 +9,7 @@ import { schoolLogoUrl } from "@/services/assessment-data";
 import { Card, EmptyState, PageHeader } from "@/components/ui/PageHeader";
 import { ActionForm } from "@/components/ui/ActionForm";
 import { ConfirmButton } from "@/components/ui/ConfirmButton";
+import { SwipeRow } from "@/components/ui/SwipeRow";
 import { LogoUpload } from "@/components/assessments/LogoUpload";
 
 export const metadata: Metadata = { title: "Escolas" };
@@ -33,6 +34,9 @@ export default async function EscolasPage() {
               const own = (classes ?? []).filter((c) => c.school_id === s.id);
               return (
                 <Card key={s.id} className="p-5">
+                  <SwipeRow
+                    actions={[{ label: "Apagar", icon: "delete", tone: "danger", run: deleteSchool.bind(null, s.id), confirm: `Apagar a escola "${s.name}"? As turmas continuam, só ficam sem escola.` }]}
+                  >
                   <div className="flex items-center gap-4">
                     <span className="grid h-16 w-16 shrink-0 place-items-center overflow-hidden rounded-xl border border-line bg-white">
                       {logos[i] ? <img src={logos[i]!} alt="" className="h-full w-full object-contain" /> : <School className="text-brand-700" />}
@@ -47,6 +51,7 @@ export default async function EscolasPage() {
                       <Trash2 size={16} />
                     </ConfirmButton>
                   </div>
+                  </SwipeRow>
                   <details className="mt-3">
                     <summary className="cursor-pointer text-[14px] font-bold text-brand-700">Editar nome e logo</summary>
                     <ActionForm action={updateSchool.bind(null, s.id)} submitLabel="Salvar escola" className="mt-3 space-y-3">

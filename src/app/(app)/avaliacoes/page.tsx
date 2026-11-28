@@ -3,6 +3,8 @@ import Link from "next/link";
 import { Eye, FilePlus2, FileUp, Pencil } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { classIdsOfCurrent } from "@/services/school-context";
+import { deleteAssessment } from "@/services/assessments";
+import { SwipeRow } from "@/components/ui/SwipeRow";
 import { Card, EmptyState, PageHeader } from "@/components/ui/PageHeader";
 import { buttonClass } from "@/components/ui/button";
 import { groupByTerm } from "@/lib/assessment/term";
@@ -68,7 +70,15 @@ export default async function AvaliacoesPage({ searchParams }: { searchParams: P
             const n = (a.assessment_questions as unknown as { count: number }[])?.[0]?.count ?? 0;
             const turma = (a.classes as unknown as { name: string } | null)?.name;
             return (
-              <div key={a.id} className="flex items-center gap-2 pr-3 sm:pr-4">
+              <SwipeRow
+                key={a.id}
+                actions={[
+                  { label: "Ver", icon: "view", tone: "neutral", href: `/avaliacoes/${a.id}/ver` },
+                  { label: "Editar", icon: "edit", tone: "brand", href: `/avaliacoes/${a.id}` },
+                  { label: "Apagar", icon: "delete", tone: "danger", run: deleteAssessment.bind(null, a.id), confirm: `Apagar a avaliação "${a.title}"? As notas dela também serão apagadas.` },
+                ]}
+              >
+              <div className="flex items-center gap-2 pr-3 sm:pr-4">
                 <Link href={`/avaliacoes/${a.id}`} className="flex min-w-0 flex-1 items-center gap-4 px-5 py-4 transition hover:bg-brand-50/60 active:bg-brand-50">
                   <span className="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-brand-50 text-brand-700">
                     <FilePlus2 size={20} />
@@ -87,6 +97,7 @@ export default async function AvaliacoesPage({ searchParams }: { searchParams: P
                   <Pencil size={17} /> <span className="hidden sm:inline">Editar</span>
                 </Link>
               </div>
+              </SwipeRow>
             );
           })}
         </Card>

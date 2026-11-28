@@ -2,7 +2,8 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { ChevronRight, School } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
-import { createClass } from "@/services/classes";
+import { createClass, deleteClass } from "@/services/classes";
+import { SwipeRow } from "@/components/ui/SwipeRow";
 import { currentSchool } from "@/services/school-context";
 import { Card, EmptyState, PageHeader } from "@/components/ui/PageHeader";
 import { ActionForm } from "@/components/ui/ActionForm";
@@ -56,7 +57,14 @@ export default async function TurmasPage() {
                   {g.items.map((c) => {
                     const count = c.students?.[0]?.count ?? 0;
                     return (
-                      <Link key={c.id} href={`/turmas/${c.id}`} className="flex items-center gap-4 px-5 py-4 transition hover:bg-brand-50/60">
+                      <SwipeRow
+                        key={c.id}
+                        actions={[
+                          { label: "Abrir", icon: "edit", tone: "brand", href: `/turmas/${c.id}` },
+                          { label: "Excluir", icon: "delete", tone: "danger", run: deleteClass.bind(null, c.id), confirm: `Excluir a turma ${c.name}? Os alunos dela também serão removidos.` },
+                        ]}
+                      >
+                      <Link href={`/turmas/${c.id}`} className="flex items-center gap-4 px-5 py-4 transition hover:bg-brand-50/60">
                         <span className="grid h-11 w-11 shrink-0 place-items-center rounded-lg bg-brand-50 text-[15px] font-extrabold text-brand-900">{c.name.slice(0, 3)}</span>
                         <span className="min-w-0 flex-1">
                           <span className="block truncate font-bold text-brand-900">{c.name}</span>
@@ -67,6 +75,7 @@ export default async function TurmasPage() {
                         </span>
                         <ChevronRight size={18} className="text-muted" />
                       </Link>
+                      </SwipeRow>
                     );
                   })}
                 </Card>

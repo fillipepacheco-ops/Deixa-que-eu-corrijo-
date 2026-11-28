@@ -3,13 +3,13 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { ArrowLeft, Check, Lock, Maximize, Minus, Play, ShieldAlert, SkipForward, Trophy, Unlock, Users, X } from "lucide-react";
+import { ArrowLeft, Check, Lock, Maximize, Minus, Play, ShieldAlert, SkipForward, Trophy, Unlock, Users, Volume2, VolumeX, X } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { MathPreview } from "@/components/math/MathPreview";
 import { GAME_COLORS, ranking } from "@/lib/game/scoring";
 import { channelName, clockOffset, remainingSeconds, rpc, type GameQuestion, type GameStatus } from "@/lib/game/client";
 import { removePlayer, saveGameResults, setCeremonyStep, unlockAll, unlockPlayer } from "@/services/games";
-import { Confetti, GameBackdrop, GameLogo, OptionBadge, SirenAlert, TimerRing, playFanfare, playSiren } from "./ui";
+import { Confetti, GameBackdrop, GameLogo, OptionBadge, SirenAlert, TimerRing, audioReady, playFanfare, playSiren, unlockAudio } from "./ui";
 
 interface HostGame {
   id: string;
@@ -125,6 +125,22 @@ export function GameHost({
     const t = setInterval(refresh, 1000);
     return () => clearInterval(t);
   }, [refresh]);
+
+  // Som: o navegador só libera depois de um toque. Qualquer toque no telão libera de vez.
+  const [soundOn, setSoundOn] = useState(false);
+  useEffect(() => {
+    const unlock = () => {
+      unlockAudio();
+      setTimeout(() => setSoundOn(audioReady()), 150);
+    };
+    const events = ["pointerdown", "touchend", "keydown", "click"] as const;
+    events.forEach((e) => window.addEventListener(e, unlock, { passive: true }));
+    const t = setInterval(() => setSoundOn(audioReady()), 1500);
+    return () => {
+      events.forEach((e) => window.removeEventListener(e, unlock));
+      clearInterval(t);
+    };
+  }, []);
 
   // fila de alertas: sirene (2,6 s) → nome na bola amarela (4 s)
   const currentAlert = alerts.length > 0 ? alerts[0].id : null;
@@ -258,6 +274,17 @@ export function GameHost({
           title="Alunos que saíram da tela"
         >
           <ShieldAlert size={16} /> Bloqueados{lockedNow.length > 0 && ` (${lockedNow.length})`}
+        </button>
+        <button
+          onClick={() => {
+            unlockAudio();
+            playFanfare();
+            setTimeout(() => setSoundOn(audioReady()), 200);
+          }}
+          className={`flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[14px] font-bold ${soundOn ? "bg-white/15 text-white" : "animate-pulse bg-red-500 text-white"}`}
+          title={soundOn ? "Testar o som" : "Toque para ligar o som da sirene"}
+        >
+          {soundOn ? <Volume2 size={16} /> : <VolumeX size={16} />} {soundOn ? "Som" : "Ligar som"}
         </button>
         <button onClick={fullscreen} className="grid h-10 w-10 place-items-center rounded-xl bg-white/10 text-white hover:bg-white/20" title="Tela cheia">
           <Maximize size={18} />

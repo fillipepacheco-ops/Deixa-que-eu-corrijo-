@@ -6,6 +6,7 @@ import { createClient } from "@/lib/supabase/server";
 import { newPin } from "@/lib/game/scoring";
 import { tidyText } from "@/lib/assessment/tidy-text";
 import { loadAssessment } from "./assessment-data";
+import { copyAssessmentToClass } from "./assessment-copy";
 import { keyFromQuestions } from "@/lib/correction/key";
 import { gradeSubmission, type GivenAnswer } from "@/lib/grading/grading";
 
@@ -17,7 +18,29 @@ const MIGRATION_MSG = "Falta rodar a atualização 0006 do banco (modo game) no 
 
 /** Cria um jogo ao vivo a partir das questões objetivas de uma avaliação. */
 export async function createGame(assessmentId: string, _: State, formData: FormData): Promise<State> {
+  let gameId: string | null = null;
+  try {
+    const r = await buildGame(assessmentId, formData);
+    if ("error" in r) return { error: r.error };
+    gameId = r.gameId;
+  } catch (e) {
+    // nunca derruba a página: mostra o motivo
+    return { error: `Não foi possível criar o jogo. (${e instanceof Error ? e.message : "erro inesperado"})` };
+  }
+  revalidatePath("/jogos");
+  redirect(`/jogo/${gameId}`);
+}
+
+async function buildGame(originalId: string, formData: FormData): Promise<{ gameId: string } | { error: string }> {
   const supabase = await createClient();
+  // turma que vai jogar (pode ser de outra escola): a prova é copiada para ela, com notas separadas
+  let assessmentId = originalId;
+  const classId = String(formData.get("class_id") ?? "");
+  if (classId) {
+    const copy = await copyAssessmentToClass(supabase, originalId, classId, { reuse: true });
+    if ("error" in copy) return { error: copy.error };
+    assessmentId = copy.id;
+  }
   const data = await loadAssessment(supabase, assessmentId);
   if (!data) return { error: "Avaliação não encontrada." };
   const teamSize = Math.min(3, Math.max(1, Number(formData.get("team_size")) || 1));
@@ -53,8 +76,8 @@ export async function createGame(assessmentId: string, _: State, formData: FormD
       game_id: gameId,
       idx,
       type: q.type,
-      statement: tidyText(q.statement) || "(sem enunciado)",
-      options: q.type === "multiple_choice" ? q.options.map((o) => ({ label: o.label, text: tidyText(o.text) })) : [],
+      statement: tidyText(String(q.statement ?? "")) || "(sem enunciado)",
+      options: q.type === "multiple_choice" ? (q.options ?? []).map((o) => ({ label: o.label, text: tidyText(String(o.text ?? "")) })) : [],
       image_url: q.image_path ? (urlOf.get(q.image_path) ?? null) : null,
       time_limit: timeLimit,
       position: q.position,
@@ -65,8 +88,7 @@ export async function createGame(assessmentId: string, _: State, formData: FormD
     await supabase.from("games").delete().eq("id", gameId);
     return { error: `Não foi possível montar o jogo. (${(qErr ?? kErr)!.message})` };
   }
-  revalidatePath("/jogos");
-  redirect(`/jogo/${gameId}`);
+  return { gameId };
 }
 
 /** Formulário da página Modo game: a avaliação vem num campo. */

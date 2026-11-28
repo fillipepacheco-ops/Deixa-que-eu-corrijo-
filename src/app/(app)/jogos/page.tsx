@@ -7,6 +7,7 @@ import { ActionForm } from "@/components/ui/ActionForm";
 import { ConfirmButton } from "@/components/ui/ConfirmButton";
 import { buttonClass } from "@/components/ui/button";
 import { createGameFromForm, deleteGame } from "@/services/games";
+import { SwipeRow } from "@/components/ui/SwipeRow";
 
 export const metadata: Metadata = { title: "Modo game" };
 
@@ -28,13 +29,16 @@ interface AssessmentRow {
 export default async function JogosPage({ searchParams }: { searchParams: Promise<{ avaliacao?: string }> }) {
   const { avaliacao } = await searchParams;
   const supabase = await createClient();
-  const [{ data: list }, games] = await Promise.all([
+  const [{ data: list }, games, { data: classes }, { data: schoolsList }] = await Promise.all([
     supabase
       .from("assessments")
       .select("id, title, classes(name), assessment_questions(type, correct_answers, annulled)")
       .order("created_at", { ascending: false }),
     supabase.from("games").select("id, title, pin, status, team_size, question_count, created_at, game_players(count)").order("created_at", { ascending: false }).limit(30),
+    supabase.from("classes").select("id, name, school_id").order("name"),
+    supabase.from("schools").select("id, name").order("name"),
   ]);
+  const schoolName = new Map((schoolsList ?? []).map((s) => [s.id as string, s.name as string]));
   const assessments = ((list ?? []) as unknown as AssessmentRow[]).map((a) => ({
     ...a,
     playable: a.assessment_questions.filter((q) => ["multiple_choice", "true_false", "numeric"].includes(q.type) && !q.annulled && q.correct_answers?.length).length,
@@ -89,6 +93,24 @@ export default async function JogosPage({ searchParams }: { searchParams: Promis
                   ))}
                 </select>
                 <p className="mt-1.5 text-[12px] text-muted">Entram as questões de múltipla escolha, certo/errado e Tipo B que têm resposta no gabarito.</p>
+              </div>
+
+              <div>
+                <label className="label" htmlFor="class_id">
+                  Turma que vai jogar
+                </label>
+                <select className="field" id="class_id" name="class_id" defaultValue="">
+                  <option value="">A turma da própria avaliação</option>
+                  {(classes ?? []).map((c) => (
+                    <option key={c.id} value={c.id}>
+                      {c.name}
+                      {c.school_id && schoolName.get(c.school_id) ? ` · ${schoolName.get(c.school_id)}` : ""}
+                    </option>
+                  ))}
+                </select>
+                <p className="mt-1.5 text-[12px] text-muted">
+                  A mesma prova serve para qualquer turma, de qualquer escola sua: a turma escolhida ganha a cópia dela, com as notas separadas.
+                </p>
               </div>
 
               <fieldset>
@@ -157,7 +179,14 @@ export default async function JogosPage({ searchParams }: { searchParams: Promis
           <h2 className="mb-2.5 text-[15px] font-extrabold text-brand-900">Jogos</h2>
           <Card className="divide-y divide-line">
             {rows.map((g) => (
-              <div key={g.id} className="flex flex-wrap items-center gap-3 px-5 py-3.5">
+              <SwipeRow
+                key={g.id}
+                actions={[
+                  { label: "Telão", icon: "view", tone: "brand", href: `/jogo/${g.id}` },
+                  { label: "Apagar", icon: "delete", tone: "danger", run: deleteGame.bind(null, g.id), confirm: `Apagar o jogo "${g.title}" (PIN ${g.pin})?` },
+                ]}
+              >
+              <div className="flex flex-wrap items-center gap-3 px-5 py-3.5">
                 <div className="min-w-0 flex-1">
                   <p className="truncate font-bold text-brand-900">{g.title}</p>
                   <p className="text-[13px] text-muted">
@@ -172,6 +201,7 @@ export default async function JogosPage({ searchParams }: { searchParams: Promis
                   <Trash2 size={16} />
                 </ConfirmButton>
               </div>
+              </SwipeRow>
             ))}
           </Card>
         </section>

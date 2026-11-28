@@ -2,6 +2,7 @@
 
 import { useActionState, useEffect, useRef, useState } from "react";
 import { Check, Loader2, Moon, Pencil, Sun, Trash2, X } from "lucide-react";
+import { SwipeRow } from "@/components/ui/SwipeRow";
 
 type State = { error?: string; ok?: boolean; message?: string };
 
@@ -63,6 +64,30 @@ export function StudentRow({
 
   if (!editing) {
     return (
+      <SwipeRow
+        contentClassName={inactive ? "bg-gray-50" : "bg-white"}
+        actions={[
+          { label: "Editar", icon: "edit", tone: "brand", run: () => setEditing(true) },
+          inactive
+            ? { label: "Voltou", icon: "sun", tone: "brand", run: () => toggle(true) }
+            : {
+                label: "Saiu",
+                icon: "moon",
+                tone: "neutral",
+                run: () => {
+                  setEditing(true);
+                  setAsking(true);
+                },
+              },
+          {
+            label: "Remover",
+            icon: "delete",
+            tone: "danger",
+            confirm: `Remover ${student.name} da turma? As notas dele também serão apagadas. Se ele só saiu da escola, use “Saiu”.`,
+            run: remove,
+          },
+        ]}
+      >
       <button
         type="button"
         onClick={() => setEditing(true)}
@@ -81,6 +106,7 @@ export function StudentRow({
         {student.registration && !inactive && <span className="hidden text-[12px] text-muted sm:inline">Mat. {student.registration}</span>}
         <Pencil size={15} className="shrink-0 text-muted" />
       </button>
+      </SwipeRow>
     );
   }
 
@@ -121,7 +147,7 @@ export function StudentRow({
             <button
               type="button"
               onClick={() => setAsking(!asking)}
-              className="inline-flex items-center gap-1 rounded-lg px-2 py-2 text-[13px] font-semibold text-gray-600 hover:bg-gray-100"
+              className="inline-flex items-center gap-1 rounded-lg border border-gray-300 bg-white px-3 py-2 text-[13px] font-bold text-gray-700 hover:bg-gray-100"
             >
               <Moon size={14} /> Não frequenta mais
             </button>
