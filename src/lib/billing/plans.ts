@@ -49,6 +49,8 @@ export interface Subscription {
   created_at?: string;
   /** Professor convidado da Prova Multi (usa só a prova para a qual foi convidado). */
   guest?: boolean;
+  /** Na lixeira desde (apagada de vez 30 dias depois). */
+  deleted_at?: string | null;
 }
 
 export type AccessState =
@@ -80,7 +82,8 @@ export function todayISO(now = new Date()): string {
   return new Intl.DateTimeFormat("en-CA", { timeZone: "America/Sao_Paulo" }).format(now);
 }
 
-export function accessState(sub: Pick<Subscription, "status" | "paid_until"> | null, today: string): AccessState {
+export function accessState(sub: (Pick<Subscription, "status" | "paid_until"> & { deleted_at?: string | null }) | null, today: string): AccessState {
+  if (sub?.deleted_at) return "suspenso"; // na lixeira
   if (!sub || sub.status === "pending") return "aguardando";
   if (sub.status === "suspended") return "suspenso";
   if (!sub.paid_until) return "em_dia";

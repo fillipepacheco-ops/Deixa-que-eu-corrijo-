@@ -43,7 +43,23 @@ export async function adminChangePlan(userId: string, formData: FormData) {
   await adminSubscription(userId, "plano", String(formData.get("plan") ?? ""));
 }
 
-/** Aba Gestão: apagar a conta (e todos os dados) de um usuário. */
+/** Aba Gestão: tirar da lixeira (volta tudo como estava). */
+export async function adminRestoreUser(userId: string) {
+  const supabase = await createClient();
+  const { error } = await supabase.rpc("admin_restore_user", { p_user: userId });
+  if (error) throw new Error(error.message);
+  revalidatePath("/gestao");
+}
+
+/** Aba Gestão: apagar de vez quem já está na lixeira. */
+export async function adminPurgeUser(userId: string) {
+  const supabase = await createClient();
+  const { error } = await supabase.rpc("admin_purge_user", { p_user: userId });
+  if (error) throw new Error(error.message);
+  revalidatePath("/gestao");
+}
+
+/** Aba Gestão: manda a conta para a lixeira (apagada de vez só depois de 30 dias). */
 export async function adminDeleteUser(userId: string) {
   const supabase = await createClient();
   const { error } = await supabase.rpc("admin_delete_user", { p_user: userId });

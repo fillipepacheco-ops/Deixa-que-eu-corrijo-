@@ -1,10 +1,10 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { Search, Trash2, Undo2 } from "lucide-react";
+import { ArchiveRestore, Search, Trash2, Undo2 } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { loadAccess } from "@/services/access";
-import { adminChangePlan, adminDeleteUser, adminSetPaidUntil, adminSubscription } from "@/services/billing";
+import { adminChangePlan, adminDeleteUser, adminPurgeUser, adminRestoreUser, adminSetPaidUntil, adminSubscription } from "@/services/billing";
 import { Card, EmptyState, PageHeader } from "@/components/ui/PageHeader";
 import { ConfirmButton } from "@/components/ui/ConfirmButton";
 import { buttonClass } from "@/components/ui/button";
@@ -22,7 +22,7 @@ import {
 
 export const metadata: Metadata = { title: "Gestão" };
 
-const FILTERS: { id: "todos" | AccessState; label: string }[] = [
+const FILTERS: { id: "todos" | "lixeira" | AccessState; label: string }[] = [
   { id: "todos", label: "Todos" },
   { id: "em_dia", label: "Em dia" },
   { id: "vencendo", label: "Vencendo" },
@@ -30,7 +30,9 @@ const FILTERS: { id: "todos" | AccessState; label: string }[] = [
   { id: "bloqueado", label: "Bloqueados" },
   { id: "suspenso", label: "Suspensos" },
   { id: "aguardando", label: "Aguardando" },
+  { id: "lixeira", label: "Lixeira" },
 ];
+const TRASH_DAYS = 30;
 
 const BADGE: Record<AccessState, string> = {
   em_dia: "bg-brand-50 text-brand-700",
@@ -53,6 +55,8 @@ export default async function GestaoPage({ searchParams }: { searchParams: Promi
   if (!access.isAdmin) notFound(); // só a conta do gestor
 
   const { f = "todos", q = "" } = await searchParams;
+  // contas na lixeira há mais de 30 dias são apagadas de vez
+  await supabase.rpc("admin_purge_trash");
   const [{ data, error }, { data: changes }] = await Promise.all([
     supabase.from("subscriptions").select("*").order("created_at", { ascending: false }),
     supabase.from("subscription_changes").select("user_id, action, at").eq("undone", false).order("at", { ascending: false }),
@@ -61,14 +65,14 @@ export default async function GestaoPage({ searchParams }: { searchParams: Promi
   for (const c of changes ?? []) if (!lastChange.has(c.user_id)) lastChange.set(c.user_id, c);
   const ACTION_NAME: Record<string, string> = { pagou: "+30 dias", suspender: "suspensão", reativar: "reativação", plano: "troca de plano", data: "mudança de vencimento" };
   const today = todayISO();
-  const rows = ((data ?? []) as Subscription[])
-    .filter((s) => s.user_id !== user.id)
-    .map((s) => ({ ...s, state: accessState(s, today) }));
+  const all = ((data ?? []) as Subscription[]).filter((s) => s.user_id !== user.id).map((s) => ({ ...s, state: accessState(s, today) }));
+  const trash = all.filter((s) => s.deleted_at);
+  const rows = all.filter((s) => !s.deleted_at);
 
-  const count = (id: string) => (id === "todos" ? rows.length : rows.filter((r) => r.state === id).length);
+  const count = (id: string) => (id === "lixeira" ? trash.length : id === "todos" ? rows.length : rows.filter((r) => r.state === id).length);
   const term = q.trim().toLowerCase();
-  const shown = rows
-    .filter((r) => f === "todos" || r.state === f)
+  const shown = (f === "lixeira" ? trash : rows)
+    .filter((r) => f === "todos" || f === "lixeira" || r.state === f)
     .filter((r) => !term || `${r.full_name ?? ""} ${r.email ?? ""}`.toLowerCase().includes(term));
 
   const paying = rows.filter((r) => r.state === "em_dia" || r.state === "vencendo" || r.state === "atrasado");
@@ -124,6 +128,38 @@ export default async function GestaoPage({ searchParams }: { searchParams: Promi
         <div className="space-y-3">
           {shown.map((r) => {
             const left = r.paid_until ? daysBetween(today, r.paid_until) : null;
+            if (r.deleted_at) {
+              const since = r.deleted_at.slice(0, 10);
+              const remaining = Math.max(0, TRASH_DAYS - daysBetween(since, today));
+              return (
+                <Card key={r.user_id} className="border-dashed bg-gray-50 p-4">
+                  <div className="flex flex-wrap items-start gap-3">
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-[16px] font-extrabold text-gray-600">{r.full_name || "(sem nome)"}</p>
+                      <p className="truncate text-[13px] text-muted">{r.email}</p>
+                    </div>
+                    <span className="rounded-full bg-gray-200 px-2.5 py-1 text-[12px] font-bold text-gray-700">Na lixeira</span>
+                  </div>
+                  <p className="mt-2 text-[13px] text-muted">
+                    Desde {brDate(since)} · apagada de vez em <b className="text-ink">{remaining} {remaining === 1 ? "dia" : "dias"}</b>. Até lá, turmas, provas,
+                    notas e arquivos continuam guardados, e a pessoa não consegue entrar.
+                  </p>
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    <form action={adminRestoreUser.bind(null, r.user_id)}>
+                      <button className={buttonClass("primary")}>
+                        <ArchiveRestore size={16} /> Restaurar conta
+                      </button>
+                    </form>
+                    <ConfirmButton
+                      action={adminPurgeUser.bind(null, r.user_id)}
+                      message={`Apagar DE VEZ a conta de ${r.full_name || r.email}? Turmas, provas, notas e arquivos serão perdidos para sempre e não dá para desfazer.`}
+                    >
+                      <Trash2 size={15} /> Apagar de vez agora
+                    </ConfirmButton>
+                  </div>
+                </Card>
+              );
+            }
             return (
               <Card key={r.user_id} className="p-4">
                 <div className="flex flex-wrap items-start gap-3">
@@ -192,9 +228,9 @@ export default async function GestaoPage({ searchParams }: { searchParams: Promi
                   </ConfirmButton>
                   <ConfirmButton
                     action={adminDeleteUser.bind(null, r.user_id)}
-                    message={`Apagar a conta de ${r.full_name || r.email}? Turmas, provas e notas dessa pessoa serão apagadas para sempre.`}
+                    message={`Tem certeza que você deseja excluir ${r.full_name || r.email}? A conta vai para a lixeira: a pessoa não consegue mais entrar, mas turmas, provas, notas e arquivos ficam guardados por ${TRASH_DAYS} dias. Até lá, dá para restaurar tudo; depois disso, é apagada automaticamente.`}
                   >
-                    <Trash2 size={15} /> Apagar
+                    <Trash2 size={15} /> Excluir
                   </ConfirmButton>
                 </div>
               </Card>
