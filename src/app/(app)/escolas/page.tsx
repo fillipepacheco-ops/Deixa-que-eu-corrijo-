@@ -24,7 +24,7 @@ export default async function EscolasPage() {
         title="Escolas"
         description="Cada escola tem as suas turmas e a sua logo. A logo vai sozinha para a prova, o cartão-resposta e as listas de notas das turmas daquela escola."
       />
-      <div className="grid gap-6 lg:grid-cols-[1fr_380px]">
+      <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_380px]">
         <div className="space-y-4">
           {schools.length === 0 ? (
             <EmptyState title="Nenhuma escola ainda" text="Cadastre ao lado as escolas em que você trabalha." />
@@ -38,7 +38,7 @@ export default async function EscolasPage() {
                       {logos[i] ? <img src={logos[i]!} alt="" className="h-full w-full object-contain" /> : <School className="text-brand-700" />}
                     </span>
                     <div className="min-w-0 flex-1">
-                      <p className="truncate text-[17px] font-extrabold text-brand-900">{s.name}</p>
+                      <p className="break-words text-[17px] font-extrabold leading-snug text-brand-900">{s.name}</p>
                       <p className="text-[13px] text-muted">
                         {own.length ? own.map((c) => c.name).join(" · ") : "Nenhuma turma ligada ainda"}
                       </p>

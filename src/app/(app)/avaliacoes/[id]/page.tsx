@@ -84,7 +84,7 @@ export default async function AvaliacaoPage({ params }: { params: Promise<{ id: 
         hasObjective={objective.length > 0}
       />
 
-      <div className="grid gap-6 xl:grid-cols-[1fr_300px]">
+      <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_300px]">
         <section>
           <Card className="mb-6 p-5">
             <details>

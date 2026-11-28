@@ -1,7 +1,7 @@
 "use client";
 /* eslint-disable @next/next/no-img-element */
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { ImagePlus, Loader2, X } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { toJpeg } from "@/components/upload/resize";
@@ -24,6 +24,19 @@ export function LogoUpload({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const input = useRef<HTMLInputElement>(null);
+
+  // formulário limpo depois de salvar (ex.: "Nova escola") → limpa a logo também
+  useEffect(() => {
+    const form = input.current?.form;
+    if (!form) return;
+    const onReset = () => {
+      setPath(initialPath ?? "");
+      setPreview(initialUrl ?? "");
+      setError("");
+    };
+    form.addEventListener("reset", onReset);
+    return () => form.removeEventListener("reset", onReset);
+  }, [initialPath, initialUrl]);
 
   async function onPick(file: File | undefined) {
     if (!file) return;

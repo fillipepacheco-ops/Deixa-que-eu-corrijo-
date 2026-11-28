@@ -74,7 +74,7 @@ export default async function ProvaMultiPage() {
           <p className="mt-2 text-[12px] text-muted">Depois do pagamento, o seu plano é trocado e a Prova Multi é liberada.</p>
         </Card>
       ) : (
-        <div className="grid gap-6 lg:grid-cols-[1fr_420px]">
+        <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_420px]">
           <div className="space-y-3">
             {(exams ?? []).length === 0 ? (
               <EmptyState title="Nenhuma Prova Multi ainda" text="Crie a primeira ao lado." />

@@ -408,7 +408,7 @@ export function CorrectionStation(props: Props) {
     const r = review.read;
     const already = studentId && corrected[studentId] !== undefined;
     return (
-      <div className="grid gap-5 lg:grid-cols-[1fr_360px]">
+      <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_360px]">
         <div className="overflow-hidden rounded-2xl border border-line bg-white">
           {proofUrl ? <img src={proofUrl} alt="Cartão corrigido" className="block w-full" /> : <p className="p-6 text-sm text-muted">Montando a correção…</p>}
         </div>

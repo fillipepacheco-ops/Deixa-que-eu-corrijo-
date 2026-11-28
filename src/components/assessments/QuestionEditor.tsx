@@ -87,7 +87,7 @@ export function QuestionEditor({
 
       <div className="border-t border-line px-4 pb-4 pt-4 sm:px-5">
         <form action={action} className="space-y-4">
-          <div className="grid gap-3 sm:grid-cols-[1fr_120px]">
+          <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_120px]">
             <div>
               <label className="label">Tipo</label>
               <select className="field" name="type" value={type} onChange={(e) => setType(e.target.value as QuestionType)}>

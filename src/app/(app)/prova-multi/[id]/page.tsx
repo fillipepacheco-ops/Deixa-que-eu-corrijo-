@@ -75,7 +75,7 @@ export default async function ProvaMultiDetail({ params }: { params: Promise<{ i
         }
       />
 
-      <div className="grid gap-6 xl:grid-cols-[1fr_380px]">
+      <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_380px]">
         <section className="space-y-4">
           <h2 className="text-[15px] font-bold text-brand-900">Professores e disciplinas (cada um é uma seção, nesta ordem)</h2>
           {slots.length === 0 && <p className="rounded-xl border border-dashed border-brand-200 bg-brand-50/60 px-4 py-6 text-center text-[14px] text-muted">Cadastre ao lado os professores que vão mandar questões.</p>}
