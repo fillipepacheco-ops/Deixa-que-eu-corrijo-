@@ -165,7 +165,7 @@ export default async function DashboardPage() {
         </div>
       )}
 
-      <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_320px]">
+      <div className="grid grid-cols-[minmax(0,1fr)] gap-6 xl:grid-cols-[minmax(0,1fr)_320px]">
         {/* Botões estilo app */}
         <section>
           <h2 className="mb-3 text-[15px] font-bold text-brand-900">Acesso rápido</h2>

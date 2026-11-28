@@ -43,7 +43,7 @@ export default async function TurmasPage() {
         description="Cadastre suas turmas uma vez, cada uma na sua escola. Elas alimentam provas, cartões-resposta, resultados e o modo game."
       />
 
-      <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_380px]">
+      <div className="grid grid-cols-[minmax(0,1fr)] gap-6 lg:grid-cols-[minmax(0,1fr)_380px]">
         <div className="space-y-6">
           {!groups.length ? (
             <EmptyState title="Nenhuma turma ainda" text="Crie sua primeira turma ao lado e depois adicione os alunos." />

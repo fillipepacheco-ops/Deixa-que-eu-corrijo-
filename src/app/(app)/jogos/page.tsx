@@ -68,7 +68,7 @@ export default async function JogosPage({ searchParams }: { searchParams: Promis
         </p>
       )}
 
-      <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_380px]">
+      <div className="grid grid-cols-[minmax(0,1fr)] gap-6 lg:grid-cols-[minmax(0,1fr)_380px]">
         <Card className="p-5 sm:p-6">
           <h2 className="mb-4 flex items-center gap-2 text-[18px] font-extrabold text-brand-900">
             <Gamepad2 size={22} className="text-brand-700" /> Novo jogo

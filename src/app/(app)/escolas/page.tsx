@@ -25,7 +25,7 @@ export default async function EscolasPage() {
         title="Escolas"
         description="Cada escola tem as suas turmas e a sua logo. A logo vai sozinha para a prova, o cartão-resposta e as listas de notas das turmas daquela escola."
       />
-      <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_380px]">
+      <div className="grid grid-cols-[minmax(0,1fr)] gap-6 lg:grid-cols-[minmax(0,1fr)_380px]">
         <div className="space-y-4">
           {schools.length === 0 ? (
             <EmptyState title="Nenhuma escola ainda" text="Cadastre ao lado as escolas em que você trabalha." />
