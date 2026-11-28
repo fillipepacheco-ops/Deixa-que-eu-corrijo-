@@ -651,6 +651,21 @@ def figure_boxes(seg, lines):
                     l["fig"] = True
                     R[0], R[1], R[2], R[3] = min(R[0], l["x0"]), min(R[1], l["top"]), max(R[2], l["x1"]), max(R[3], l["bottom"])
                     grew = True
+    # depois de pegar os rótulos, figuras que se encostam viram uma só (ex.: colchetes da matriz + números)
+    changed = True
+    while changed:
+        changed = False
+        for i in range(len(result)):
+            for j in range(i + 1, len(result)):
+                A, B = result[i], result[j]
+                U = [min(A[0], B[0]), min(A[1], B[1]), max(A[2], B[2]), max(A[3], B[3])]
+                if A[1] <= B[3] + 4 and A[3] >= B[1] - 4 and A[0] <= B[2] + 6 and A[2] >= B[0] - 6 and not splits_markers(mk, U):
+                    result[i] = U
+                    result.pop(j)
+                    changed = True
+                    break
+            if changed:
+                break
     return [R for R in result if R[3] - R[1] >= 6]
 
 
