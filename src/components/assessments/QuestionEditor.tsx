@@ -7,6 +7,8 @@ import { FormulaPalette } from "@/components/math/FormulaPalette";
 import type { TextField } from "@/components/math/math-field";
 import { QuestionImage, type QuestionImageHandle } from "./QuestionImage";
 import { mathToPlain, parseMath } from "@/lib/math/parse";
+import { MathPreview } from "@/components/math/MathPreview";
+import { inlineImageSources, stripInline } from "@/lib/assessment/inline-images";
 import type { AssessmentQuestion, QuestionType } from "@/lib/models/types";
 import { OPTION_LABELS, QUESTION_TYPE_NAMES } from "@/lib/assessment/question-form";
 import { QUESTION_LABEL } from "@/lib/assessment/header";
@@ -72,7 +74,7 @@ export function QuestionEditor({
         <span className="rounded-lg bg-brand-900 px-2.5 py-1 text-[12px] font-extrabold tracking-wide text-white">{QUESTION_LABEL(number)}</span>
         <span className="min-w-0 flex-1">
           <span className="block truncate text-[14px] font-medium text-ink">
-            {q.statement ? mathToPlain(parseMath(q.statement)) : <em className="text-muted">Sem enunciado</em>}
+            {q.statement ? mathToPlain(parseMath(stripInline(q.statement))) : <em className="text-muted">Sem enunciado</em>}
           </span>
           <span className="block text-[12px] text-muted">
             {QUESTION_TYPE_NAMES[q.type]} ·{" "}
@@ -80,7 +82,7 @@ export function QuestionEditor({
             {q.weight !== 1 && ` · peso ${q.weight.toLocaleString("pt-BR")}`}
           </span>
         </span>
-        {q.image_path && <span className="rounded-full bg-brand-50 px-2 py-0.5 text-[11px] font-bold text-brand-700">imagem</span>}
+        {(q.image_path || inlineImageSources(q).length > 0) && <span className="rounded-full bg-brand-50 px-2 py-0.5 text-[11px] font-bold text-brand-700">imagem</span>}
         {q.annulled && <span className="rounded-full bg-red-50 px-2 py-0.5 text-[11px] font-bold uppercase text-red-700">Anulada</span>}
         <span className="text-[13px] font-semibold text-brand-700 group-open:hidden">Editar</span>
       </summary>
@@ -129,6 +131,25 @@ export function QuestionEditor({
               onImagePaste={(f) => imageRef.current?.upload(f)}
             />
           </div>
+
+          {inlineImageSources(q).length > 0 && (
+            <div className="rounded-xl border border-line bg-brand-50/40 p-3">
+              <p className="mb-2 text-[12px] font-semibold text-muted">
+                Como a questão sai na prova (as marcações [[img:...]] no texto são as figuras, no lugar exato de cada uma):
+              </p>
+              <MathPreview text={q.statement} className="text-[13px] leading-snug text-ink" />
+              {type === "multiple_choice" && (
+                <div className="mt-2 space-y-1">
+                  {q.options.map((o) => (
+                    <div key={o.label} className="flex gap-2 text-[13px]">
+                      <b className="text-brand-700">({o.label})</b>
+                      <MathPreview text={o.text} className="min-w-0 flex-1" />
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
 
           <div>
             <label className="label">Imagem da questão</label>

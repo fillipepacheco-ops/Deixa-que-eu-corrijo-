@@ -7,6 +7,7 @@
  * Cada questão fica "presa" (manter com o próximo) para não ser cortada
  * entre páginas quando o professor editar no Word.
  */
+import { splitInline, stripInline } from "@/lib/assessment/inline-images";
 import { tidyText } from "@/lib/assessment/tidy-text";
 import {
   AlignmentType,
@@ -218,6 +219,19 @@ function sectionHeading(text: string): Paragraph {
   });
 }
 
+/** Figura citada no texto ([[img:...]]): tamanho original em mm, sem passar da coluna. */
+function inlineImageRun(q: AssessmentQuestion, src: string, wmm: number | null, maxTwips: number): ImageRun | null {
+  const im = q.inline?.[src];
+  if (!im) return null;
+  const { width, height } = imageSize(im.bytes, im.kind);
+  if (!width || !height) return null;
+  const naturalPx = wmm ? (wmm / 25.4) * 96 : (width / 200) * 96;
+  const maxPx = Math.round((maxTwips / 1440) * 96);
+  const w = Math.min(naturalPx, maxPx);
+  const scale = w / width;
+  return new ImageRun({ type: im.kind, data: im.bytes, transformation: { width: Math.round(width * scale), height: Math.round(height * scale) } });
+}
+
 function questionBlocks(q: AssessmentQuestion, number: number): (Paragraph | Table)[] {
   const blocks: (Paragraph | Table)[] = [];
   // Sem "manter com o próximo" em tudo: o Word encaixa as questões uma embaixo da outra
@@ -234,17 +248,24 @@ function questionBlocks(q: AssessmentQuestion, number: number): (Paragraph | Tab
 
   const paragraphs = tidyText(q.statement).split(/\n/).filter((p) => p.trim() !== "");
   const stmt = paragraphs.length ? paragraphs : [" "];
-  stmt.forEach((p, i) =>
+  stmt.forEach((p, i) => {
+    const seg = splitInline(p);
+    // linha que é só uma figura do banco de questões: imagem centralizada no lugar dela
+    if (seg.length === 1 && seg[0].t === "img") {
+      const run = inlineImageRun(q, seg[0].src, seg[0].wmm, COL_W);
+      if (run) blocks.push(new Paragraph({ keepNext: true, alignment: AlignmentType.CENTER, spacing: { before: 60, after: 100 }, children: [run] }));
+      return;
+    }
     blocks.push(
       new Paragraph({
         keepNext: i === stmt.length - 1, // o fim do enunciado fica com o que vem depois
         widowControl: true,
         alignment: AlignmentType.JUSTIFIED,
         spacing: { ...LINE_15, after: 80 },
-        children: markupToDocx(p, { size: SIZE, font: FONT }),
+        children: markupToDocx(stripInline(p, ""), { size: SIZE, font: FONT }),
       }),
-    ),
-  );
+    );
+  });
 
   if (q.image) {
     const { width, height } = imageSize(q.image.bytes, q.image.kind);
@@ -317,7 +338,13 @@ function questionBlocks(q: AssessmentQuestion, number: number): (Paragraph | Tab
           children: [
             new TextRun({ text: `(${opt.label})`, bold: true, size: SIZE, color: MID, font: FONT }),
             new TextRun({ text: "\t", size: SIZE, font: FONT }),
-            ...markupToDocx(tidyText(opt.text), { size: SIZE, font: FONT }),
+            ...splitInline(tidyText(opt.text)).flatMap((seg) => {
+              if (seg.t === "img") {
+                const run = inlineImageRun(q, seg.src, seg.wmm, COL_W - 567);
+                return run ? [run] : [];
+              }
+              return seg.s.trim() ? markupToDocx(seg.s.replace(/\n+/g, " "), { size: SIZE, font: FONT }) : [];
+            }),
           ],
         }),
       );

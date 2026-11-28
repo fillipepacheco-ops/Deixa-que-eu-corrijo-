@@ -29,7 +29,7 @@ export interface NavItem {
 export const NAV: NavItem[] = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard, ready: true, mobile: true },
   { href: "/avaliacoes", label: "Avaliações", icon: FileText, ready: true, mobile: true },
-  { href: "/banco-de-questoes", label: "Banco de Questões", icon: Library, ready: false },
+  { href: "/banco-de-questoes", label: "Banco de Questões", icon: Library, ready: true },
   { href: "/escolas", label: "Escolas", icon: School, ready: true },
   { href: "/turmas", label: "Turmas", icon: GraduationCap, ready: true, mobile: true },
   { href: "/alunos", label: "Alunos", icon: Users, ready: true },

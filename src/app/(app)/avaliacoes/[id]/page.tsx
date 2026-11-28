@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { ArrowLeft, BarChart3, Eye, FileUp, Gamepad2, Plus, Trash2 } from "lucide-react";
+import { ArrowLeft, BarChart3, Eye, FileUp, Gamepad2, Library, Plus, Trash2 } from "lucide-react";
 import { buttonClass } from "@/components/ui/button";
 import { createClient } from "@/lib/supabase/server";
 import { loadAssessment, loadStudents, questionImageUrls, schoolLogoUrl } from "@/services/assessment-data";
@@ -195,6 +195,12 @@ export default async function AvaliacaoPage({ params }: { params: Promise<{ id: 
               className="mt-2 flex w-full items-center justify-center gap-1.5 rounded-xl border border-line bg-white px-3 py-2.5 text-[13px] font-semibold text-brand-900 hover:border-brand-200 active:scale-[0.98]"
             >
               <FileUp size={15} /> Importar questões de um PDF ou Word
+            </Link>
+            <Link
+              href={`/banco-de-questoes?avaliacao=${id}`}
+              className="mt-2 flex w-full items-center justify-center gap-1.5 rounded-xl border border-brand-200 bg-white px-3 py-2.5 text-[13px] font-bold text-brand-900 hover:bg-brand-50 active:scale-[0.98]"
+            >
+              <Library size={15} /> Buscar no Banco de Questões (ENEM com figuras e gabarito)
             </Link>
           </div>
         </section>

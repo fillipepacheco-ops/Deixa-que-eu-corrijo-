@@ -1,5 +1,6 @@
 import { Fragment } from "react";
 import { parseMath, type MathNode } from "@/lib/math/parse";
+import { splitInline } from "@/lib/assessment/inline-images";
 
 function Nodes({ nodes }: { nodes: MathNode[] }) {
   return (
@@ -68,11 +69,31 @@ export function MathPreview({ text, className = "" }: { text: string; className?
   const lines = text.split("\n");
   return (
     <div className={className}>
-      {lines.map((l, i) => (
-        <p key={i} className="min-h-[1.2em] text-justify">
-          <Nodes nodes={parseMath(l)} />
-        </p>
-      ))}
+      {lines.map((l, i) => {
+        const segs = splitInline(l);
+        // figura do banco de questões ([[img:...]]): no lugar dela, no tamanho original (até a largura da tela)
+        if (segs.some((s) => s.t === "img")) {
+          return (
+            <div key={i} className="my-1.5">
+              {segs.map((s, j) =>
+                s.t === "img" ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img key={j} src={s.src} alt="" loading="lazy" className="mx-auto block h-auto max-w-full" style={s.wmm ? { width: `${s.wmm}mm` } : undefined} />
+                ) : s.s.trim() ? (
+                  <p key={j} className="text-justify">
+                    <Nodes nodes={parseMath(s.s)} />
+                  </p>
+                ) : null,
+              )}
+            </div>
+          );
+        }
+        return (
+          <p key={i} className="min-h-[1.2em] text-justify">
+            <Nodes nodes={parseMath(l)} />
+          </p>
+        );
+      })}
     </div>
   );
 }

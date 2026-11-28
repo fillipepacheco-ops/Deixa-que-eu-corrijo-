@@ -1,0 +1,124 @@
+/**
+ * BANCO DE QUESTÕES — ENEM (2º dia, caderno amarelo: Ciências da Natureza e Matemática).
+ *
+ * Questões extraídas das provas oficiais com texto fiel e as figuras recortadas
+ * no lugar exato de cada uma ([[img:...]]), gabarito oficial e classificação
+ * área › disciplina › tópico › subtópico (uma questão pode ter mais de uma).
+ */
+import data from "@/data/banco/enem.json";
+import tax from "@/data/banco/taxonomia.json";
+import { stripInline } from "@/lib/assessment/inline-images";
+import { OPTION_LABELS } from "@/lib/assessment/question-form";
+
+export interface BankQuestion {
+  id: string;
+  /** ano de aplicação */
+  y: number;
+  /** número da questão na prova */
+  n: number;
+  area: string;
+  /** disciplina principal */
+  d: string;
+  /** [disciplina, tópico, subtópico] */
+  tags: [string, string, string][];
+  /** enunciado (parágrafos separados por \n, fórmulas e figuras marcadas) */
+  st: string;
+  /** alternativas A–E */
+  op: string[];
+  /** gabarito oficial (null = anulada) */
+  ans: string | null;
+  nul: boolean;
+}
+
+export interface TaxDiscipline {
+  d: string;
+  topics: { t: string; subs: string[] }[];
+}
+
+export const ENEM_QUESTIONS = data as unknown as BankQuestion[];
+export const TAXONOMY = tax as unknown as TaxDiscipline[];
+export const ENEM_YEARS = [...new Set(ENEM_QUESTIONS.map((q) => q.y))].sort((a, b) => b - a);
+export const ENEM_AREAS = [...new Set(ENEM_QUESTIONS.map((q) => q.area))];
+
+export interface BankFilter {
+  ano?: number | null;
+  area?: string | null;
+  d?: string | null;
+  t?: string | null;
+  s?: string | null;
+  q?: string | null;
+  /** esconder as anuladas */
+  semAnuladas?: boolean;
+}
+
+const fold = (s: string) =>
+  s
+    .normalize("NFD")
+    .replace(/[̀-ͯ]/g, "")
+    .toLowerCase();
+
+const searchIndex = new Map<string, string>();
+function searchable(q: BankQuestion) {
+  let s = searchIndex.get(q.id);
+  if (!s) {
+    s = fold(stripInline([q.st, ...q.op].join(" "), " ").replace(/\\frac\{([^}]*)\}\{([^}]*)\}/g, "$1/$2").replace(/[_^]\{([^}]*)\}/g, "$1"));
+    searchIndex.set(q.id, s);
+  }
+  return s;
+}
+
+/** Questões que passam no filtro (todas as palavras da busca precisam aparecer). */
+export function filterBank(list: BankQuestion[], f: BankFilter): BankQuestion[] {
+  const words = fold(f.q ?? "")
+    .split(/\s+/)
+    .filter((w) => w.length > 1);
+  return list.filter((q) => {
+    if (f.ano && q.y !== f.ano) return false;
+    if (f.area && q.area !== f.area) return false;
+    if (f.semAnuladas && q.nul) return false;
+    if (f.d || f.t || f.s) {
+      const ok = q.tags.some(([d, t, s]) => (!f.d || d === f.d) && (!f.t || t === f.t) && (!f.s || s === f.s));
+      if (!ok) return false;
+    }
+    if (words.length) {
+      const text = searchable(q);
+      if (!words.every((w) => text.includes(w))) return false;
+    }
+    return true;
+  });
+}
+
+/** Quantas questões há em cada disciplina › tópico › subtópico (para os filtros). */
+export function tagCounts(list: BankQuestion[]) {
+  const counts = new Map<string, number>();
+  for (const q of list) {
+    const seen = new Set<string>();
+    for (const [d, t, s] of q.tags) {
+      for (const k of [d, `${d}|${t}`, `${d}|${t}|${s}`]) {
+        if (seen.has(k)) continue;
+        seen.add(k);
+        counts.set(k, (counts.get(k) ?? 0) + 1);
+      }
+    }
+  }
+  return Object.fromEntries(counts);
+}
+
+export function sourceLabel(q: BankQuestion) {
+  return `ENEM ${q.y}`;
+}
+
+/** Linha de assessment_questions: o enunciado começa com a origem e o ano, ex.: (ENEM 2025). */
+export function bankQuestionRow(q: BankQuestion) {
+  const tag = `(${sourceLabel(q)})`;
+  const statement = q.st.startsWith("[[img:") ? `${tag}\n${q.st}` : `${tag} ${q.st}`;
+  const options = OPTION_LABELS.map((label, i) => ({ label, text: q.op[i] ?? "" })).filter((o) => o.text.trim());
+  return {
+    type: "multiple_choice" as const,
+    statement,
+    options,
+    correct_answers: q.ans ? [q.ans] : [],
+    weight: 1,
+    annulled: q.nul,
+  };
+}

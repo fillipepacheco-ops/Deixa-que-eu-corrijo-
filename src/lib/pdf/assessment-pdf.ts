@@ -13,6 +13,7 @@ import type { Assessment, AssessmentQuestion, PdfTemplate } from "@/lib/models/t
 import { A4, BRAND, drawLine, drawTextTop, formatDateBR, mm, sanitize, wrapLines, wrapText } from "./common";
 import { QUESTION_LABEL, examHeader } from "@/lib/assessment/header";
 import { layoutRich, type RichFonts } from "./rich-text";
+import { splitInline } from "@/lib/assessment/inline-images";
 
 export interface TemplateConfig {
   columns: 1 | 2;
@@ -141,6 +142,40 @@ export async function generateAssessmentPdf(input: AssessmentPdfInput): Promise<
     if (!q.image) continue;
     images.set(q.position, q.image.kind === "png" ? await doc.embedPng(q.image.bytes) : await doc.embedJpg(q.image.bytes));
   }
+  // figuras no meio do texto (banco de questões): cada uma embutida uma vez só
+  const inlineImgs = new Map<string, PDFImage>();
+  for (const q of questions) {
+    for (const [src, im] of Object.entries(q.inline ?? {})) {
+      if (inlineImgs.has(src)) continue;
+      try {
+        inlineImgs.set(src, im.kind === "png" ? await doc.embedPng(im.bytes) : await doc.embedJpg(im.bytes));
+      } catch {
+        // imagem inválida: a questão sai sem ela
+      }
+    }
+  }
+  /** Peça com uma figura do texto: tamanho original (largura em mm), sem passar da coluna. */
+  const inlinePiece = (img: PDFImage, wmm: number | null, x0: number, maxW: number, extra?: (page: PDFPage, x: number, top: number) => void): Piece => {
+    const natural = wmm ? mm(wmm) : (img.width * 72) / 200;
+    const maxH = mm(120);
+    const w0 = Math.min(natural, maxW);
+    const scale = Math.min(w0 / img.width, maxH / img.height);
+    const pad = lh * 0.3;
+    const make = (w: number, h: number): Piece => ({
+      h: h + pad,
+      brk: true,
+      draw: (page, x, top) => {
+        page.drawImage(img, { x: x + x0 + Math.max(0, (maxW - w) / 2), y: A4.h - top - pad / 2 - h, width: w, height: h });
+        extra?.(page, x, top);
+      },
+      shrink: (avail) => {
+        const target = avail - pad;
+        if (target < Math.max(mm(25), h * 0.65) || target >= h) return null;
+        return make((w * target) / h, target);
+      },
+    });
+    return make(img.width * scale, img.height * scale);
+  };
 
   // ---------- montagem das peças de cada questão ----------
   const groups: { number: number; pieces: Piece[] }[] = questions.map((q, idx) => {
@@ -205,23 +240,42 @@ export async function generateAssessmentPdf(input: AssessmentPdfInput): Promise<
       });
     }
 
-    // Enunciado.
+    // Enunciado com fórmulas (expoente, fração, raiz, símbolos) e, nas questões do banco,
+    // as figuras no lugar exato em que aparecem no texto.
     const statement = tidyText(q.statement) || "(enunciado não preenchido)";
-    // Enunciado com fórmulas (expoente, fração, raiz, símbolos).
-    const stLines = layoutRich(statement, { fonts: rich, size: fs, maxWidth: textW, lineHeight: cfg.lineHeight, justify: cfg.justify });
-    stLines.forEach((line, i) => {
-      pieces.push({
-        h: line.height,
-        // Pode continuar na outra coluna depois das 2 primeiras linhas, sem deixar 1 linha sozinha no fim.
-        brk: i >= 2 && i <= stLines.length - 2,
-        draw: (page, x, top) => {
-          if (i === 0 && cfg.questionHeading === "inline") {
-            drawTextTop(page, `${number}.`, { x, top: top + line.baseline - fs * 0.8, size: fs, font: bold, color: BRAND.dark });
-          }
-          line.draw(page, x + indent, top);
-        },
+    let numberPending = cfg.questionHeading === "inline";
+    for (const seg of splitInline(statement)) {
+      if (seg.t === "img") {
+        const img = inlineImgs.get(seg.src);
+        if (!img) continue;
+        const drawNum = numberPending;
+        numberPending = false;
+        pieces.push(
+          inlinePiece(img, seg.wmm, indent, textW, (page, x, top) => {
+            if (drawNum) drawTextTop(page, `${number}.`, { x, top, size: fs, font: bold, color: BRAND.dark });
+          }),
+        );
+        continue;
+      }
+      const txt = seg.s.replace(/^\n+|\n+$/g, "");
+      if (!txt.trim()) continue;
+      const stLines = layoutRich(txt, { fonts: rich, size: fs, maxWidth: textW, lineHeight: cfg.lineHeight, justify: cfg.justify });
+      const drawNum = numberPending;
+      numberPending = false;
+      stLines.forEach((line, i) => {
+        pieces.push({
+          h: line.height,
+          // Pode continuar na outra coluna depois das 2 primeiras linhas, sem deixar 1 linha sozinha no fim.
+          brk: i >= 2 && i <= stLines.length - 2,
+          draw: (page, x, top) => {
+            if (i === 0 && drawNum) {
+              drawTextTop(page, `${number}.`, { x, top: top + line.baseline - fs * 0.8, size: fs, font: bold, color: BRAND.dark });
+            }
+            line.draw(page, x + indent, top);
+          },
+        });
       });
-    });
+    }
 
     // Imagem logo abaixo do enunciado.
     const img = images.get(q.position);
@@ -289,18 +343,36 @@ export async function generateAssessmentPdf(input: AssessmentPdfInput): Promise<
       const optIndent = fs * 2.2;
       q.options.forEach((opt, oi) => {
         const lastPair = oi === q.options.length - 1 && oi > 1; // a última alternativa não fica sozinha
-        const lines = layoutRich(tidyText(opt.text), { fonts: rich, size: fs, maxWidth: textW - optIndent, lineHeight: cfg.lineHeight, justify: cfg.justify });
-        lines.forEach((line, i) => {
-          pieces.push({
-            h: line.height,
-            brk: i === 0 && !lastPair, // a alternativa nunca fica partida
-            draw: (page, x, top) => {
-              // rótulo alinhado à linha de base do texto (que pode ser mais alta por causa de fração)
-              if (i === 0) drawTextTop(page, `(${opt.label})`, { x: x + indent, top: top + line.baseline - fs * 0.8, size: fs, font: bold, color: BRAND.mid });
-              line.draw(page, x + indent + optIndent, top);
-            },
+        let first = true;
+        for (const seg of splitInline(tidyText(opt.text))) {
+          if (seg.t === "img") {
+            const img = inlineImgs.get(seg.src);
+            if (!img) continue;
+            const isFirst = first;
+            first = false;
+            const p = inlinePiece(img, seg.wmm, indent + optIndent, textW - optIndent, (page, x, top) => {
+              if (isFirst) drawTextTop(page, `(${opt.label})`, { x: x + indent, top: top + 2, size: fs, font: bold, color: BRAND.mid });
+            });
+            pieces.push({ ...p, brk: isFirst && !lastPair, shrink: undefined });
+            continue;
+          }
+          const txt = seg.s.replace(/^\n+|\n+$/g, "");
+          if (!txt.trim()) continue;
+          const lines = layoutRich(txt, { fonts: rich, size: fs, maxWidth: textW - optIndent, lineHeight: cfg.lineHeight, justify: cfg.justify });
+          lines.forEach((line, i) => {
+            const isFirst = first && i === 0;
+            pieces.push({
+              h: line.height,
+              brk: isFirst && !lastPair, // a alternativa nunca fica partida
+              draw: (page, x, top) => {
+                // rótulo alinhado à linha de base do texto (que pode ser mais alta por causa de fração)
+                if (isFirst) drawTextTop(page, `(${opt.label})`, { x: x + indent, top: top + line.baseline - fs * 0.8, size: fs, font: bold, color: BRAND.mid });
+                line.draw(page, x + indent + optIndent, top);
+              },
+            });
           });
-        });
+          first = false;
+        }
       });
     } else if (q.type === "true_false") {
       pieces.push({

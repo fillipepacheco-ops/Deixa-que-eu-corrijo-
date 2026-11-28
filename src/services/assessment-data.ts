@@ -1,5 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Assessment, AssessmentQuestion, QuestionOption, QuestionType } from "@/lib/models/types";
+import { inlineImageSources, isAllowedInlineSrc } from "@/lib/assessment/inline-images";
 
 export interface AssessmentRow {
   id: string;
@@ -129,6 +130,62 @@ export async function attachQuestionImages(supabase: SupabaseClient, questions: 
       if (!data) return;
       const bytes = new Uint8Array(await data.arrayBuffer());
       q.image = { bytes, kind: bytes[0] === 0x89 ? "png" : "jpg" };
+    }),
+  );
+  await attachInlineImages(questions);
+  return questions;
+}
+
+// ---------- figuras do banco de questões ([[img:/banco/...]]) ----------
+const inlineCache = new Map<string, Promise<Uint8Array | null>>();
+
+async function siteOrigin(): Promise<string> {
+  try {
+    const { headers } = await import("next/headers");
+    const h = await headers();
+    const host = h.get("x-forwarded-host") ?? h.get("host");
+    if (host) return `${h.get("x-forwarded-proto") ?? (host.startsWith("localhost") ? "http" : "https")}://${host}`;
+  } catch {
+    // fora de uma requisição (testes)
+  }
+  return process.env.NEXT_PUBLIC_SITE_URL ?? "https://deixa-que-eu-corrijo.vercel.app";
+}
+
+async function readInlineImage(src: string): Promise<Uint8Array | null> {
+  // 1) arquivo da pasta public (quando existe no servidor)
+  try {
+    const { readFile } = await import("node:fs/promises");
+    const { join } = await import("node:path");
+    return new Uint8Array(await readFile(join(process.cwd(), "public", src)));
+  } catch {
+    // 2) pelo próprio site
+  }
+  try {
+    const res = await fetch(`${await siteOrigin()}${src}`, { cache: "force-cache" });
+    if (!res.ok) return null;
+    return new Uint8Array(await res.arrayBuffer());
+  } catch {
+    return null;
+  }
+}
+
+/** Baixa as figuras citadas no texto das questões (para o PDF e o Word). */
+export async function attachInlineImages(questions: AssessmentQuestion[]) {
+  await Promise.all(
+    questions.map(async (q) => {
+      const srcs = inlineImageSources(q).filter(isAllowedInlineSrc);
+      if (!srcs.length) return;
+      const inline: NonNullable<AssessmentQuestion["inline"]> = {};
+      for (const src of srcs) {
+        if (!inlineCache.has(src)) inlineCache.set(src, readInlineImage(src));
+        const bytes = await inlineCache.get(src)!;
+        if (!bytes) {
+          inlineCache.delete(src);
+          continue;
+        }
+        inline[src] = { bytes, kind: bytes[0] === 0x89 ? "png" : "jpg" };
+      }
+      q.inline = inline;
     }),
   );
   return questions;

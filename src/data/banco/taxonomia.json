@@ -1,0 +1,341 @@
+[
+ {
+  "d": "Matemática",
+  "topics": [
+   {
+    "t": "Aritmética e números",
+    "subs": [
+     "Operações e problemas com números naturais",
+     "Múltiplos, divisores, MMC e MDC",
+     "Frações e números decimais",
+     "Sistema de numeração e notação científica",
+     "Potenciação e radiciação",
+     "Números inteiros e reta numérica"
+    ]
+   },
+   {
+    "t": "Razão, proporção e porcentagem",
+    "subs": [
+     "Razão e proporção",
+     "Regra de três",
+     "Escala",
+     "Porcentagem",
+     "Juros e matemática financeira",
+     "Grandezas e unidades de medida",
+     "Velocidade, densidade e taxas"
+    ]
+   },
+   {
+    "t": "Álgebra e funções",
+    "subs": [
+     "Equações do 1º grau e problemas",
+     "Sistemas de equações",
+     "Função afim (1º grau)",
+     "Função quadrática (2º grau)",
+     "Função exponencial",
+     "Logaritmo",
+     "Funções trigonométricas",
+     "Leitura e interpretação de gráficos",
+     "Inequações e desigualdades",
+     "Expressões algébricas e fórmulas"
+    ]
+   },
+   {
+    "t": "Sequências",
+    "subs": [
+     "PA: termo geral",
+     "PA: soma dos termos",
+     "PG: termo geral",
+     "PG: soma dos termos",
+     "Sequências e padrões"
+    ]
+   },
+   {
+    "t": "Geometria plana",
+    "subs": [
+     "Ângulos, retas e polígonos",
+     "Triângulos e semelhança",
+     "Teorema de Pitágoras",
+     "Áreas de figuras planas",
+     "Perímetro",
+     "Circunferência e círculo",
+     "Trigonometria no triângulo retângulo",
+     "Simetria, transformações e ladrilhamento"
+    ]
+   },
+   {
+    "t": "Geometria espacial",
+    "subs": [
+     "Prismas e cubos",
+     "Cilindros",
+     "Cones",
+     "Pirâmides",
+     "Esferas",
+     "Volume e capacidade",
+     "Planificação, vistas e projeções",
+     "Poliedros (vértices, arestas e faces)"
+    ]
+   },
+   {
+    "t": "Geometria analítica",
+    "subs": [
+     "Plano cartesiano e pontos",
+     "Distância entre pontos",
+     "Equação da reta",
+     "Equação da circunferência"
+    ]
+   },
+   {
+    "t": "Estatística",
+    "subs": [
+     "Média aritmética e ponderada",
+     "Mediana e moda",
+     "Desvio padrão e variância",
+     "Tabelas e gráficos estatísticos"
+    ]
+   },
+   {
+    "t": "Contagem e probabilidade",
+    "subs": [
+     "Princípio fundamental da contagem",
+     "Permutação e arranjo",
+     "Combinação",
+     "Probabilidade simples",
+     "Probabilidade condicional e eventos"
+    ]
+   },
+   {
+    "t": "Matemática financeira e cotidiano",
+    "subs": [
+     "Orçamento, compras e tarifas"
+    ]
+   }
+  ]
+ },
+ {
+  "d": "Física",
+  "topics": [
+   {
+    "t": "Cinemática",
+    "subs": [
+     "Movimento uniforme e velocidade média",
+     "Movimento uniformemente variado",
+     "Queda livre e lançamentos",
+     "Movimento circular",
+     "Gráficos do movimento"
+    ]
+   },
+   {
+    "t": "Dinâmica",
+    "subs": [
+     "Leis de Newton",
+     "Atrito",
+     "Plano inclinado",
+     "Força peso, normal e tração",
+     "Força elástica (Hooke)",
+     "Movimento circular e força centrípeta"
+    ]
+   },
+   {
+    "t": "Energia, trabalho e potência",
+    "subs": [
+     "Energia cinética e potencial",
+     "Trabalho e potência mecânica",
+     "Transformações e fontes de energia"
+    ]
+   },
+   {
+    "t": "Impulso e quantidade de movimento",
+    "subs": [
+     "Colisões e conservação do momento"
+    ]
+   },
+   {
+    "t": "Gravitação",
+    "subs": [
+     "Gravitação universal e órbitas"
+    ]
+   },
+   {
+    "t": "Estática e hidrostática",
+    "subs": [
+     "Equilíbrio e alavancas (torque)",
+     "Pressão, empuxo e densidade"
+    ]
+   },
+   {
+    "t": "Termologia",
+    "subs": [
+     "Temperatura e escalas termométricas",
+     "Calor sensível, latente e calorimetria",
+     "Propagação do calor",
+     "Dilatação térmica",
+     "Termodinâmica e máquinas térmicas"
+    ]
+   },
+   {
+    "t": "Óptica",
+    "subs": [
+     "Reflexão e espelhos",
+     "Refração e lentes",
+     "Luz, cores e sombras",
+     "Visão e olho humano"
+    ]
+   },
+   {
+    "t": "Ondulatória",
+    "subs": [
+     "Ondas: frequência, comprimento e velocidade",
+     "Som e acústica",
+     "Fenômenos ondulatórios (interferência, difração, efeito Doppler)",
+     "Ondas eletromagnéticas e radiação"
+    ]
+   },
+   {
+    "t": "Eletricidade",
+    "subs": [
+     "Eletrostática e carga elétrica",
+     "Corrente, resistência e leis de Ohm",
+     "Circuitos elétricos (série e paralelo)",
+     "Potência e consumo de energia elétrica"
+    ]
+   },
+   {
+    "t": "Magnetismo e eletromagnetismo",
+    "subs": [
+     "Ímãs e campo magnético",
+     "Indução eletromagnética, motores e geradores"
+    ]
+   },
+   {
+    "t": "Física moderna",
+    "subs": [
+     "Efeito fotoelétrico, radioatividade e física nuclear"
+    ]
+   }
+  ]
+ },
+ {
+  "d": "Química",
+  "topics": [
+   {
+    "t": "Química geral",
+    "subs": [
+     "Modelos atômicos e estrutura do átomo",
+     "Tabela periódica e propriedades",
+     "Ligações químicas e geometria molecular",
+     "Substâncias, misturas e separação",
+     "Propriedades da matéria e mudanças de estado"
+    ]
+   },
+   {
+    "t": "Físico-química",
+    "subs": [
+     "Soluções e concentração",
+     "Estequiometria e cálculos químicos",
+     "Termoquímica",
+     "Cinética química",
+     "Equilíbrio químico e pH",
+     "Eletroquímica (pilhas e eletrólise)",
+     "Radioatividade",
+     "Propriedades coligativas e gases"
+    ]
+   },
+   {
+    "t": "Química inorgânica",
+    "subs": [
+     "Ácidos, bases, sais e óxidos",
+     "Reações químicas e balanceamento"
+    ]
+   },
+   {
+    "t": "Química orgânica",
+    "subs": [
+     "Funções orgânicas",
+     "Isomeria",
+     "Reações orgânicas",
+     "Polímeros",
+     "Bioquímica e química dos alimentos",
+     "Cadeias carbônicas e nomenclatura"
+    ]
+   },
+   {
+    "t": "Química ambiental",
+    "subs": [
+     "Poluição, chuva ácida e efeito estufa"
+    ]
+   }
+  ]
+ },
+ {
+  "d": "Biologia",
+  "topics": [
+   {
+    "t": "Citologia",
+    "subs": [
+     "Célula e organelas",
+     "Membrana plasmática e transporte",
+     "Metabolismo energético (respiração e fermentação)",
+     "Fotossíntese",
+     "Divisão celular (mitose e meiose)"
+    ]
+   },
+   {
+    "t": "Genética e biologia molecular",
+    "subs": [
+     "DNA, RNA e síntese de proteínas",
+     "Leis de Mendel e heredograma",
+     "Herança ligada ao sexo e grupos sanguíneos",
+     "Biotecnologia e engenharia genética"
+    ]
+   },
+   {
+    "t": "Evolução",
+    "subs": [
+     "Teorias evolutivas e seleção natural"
+    ]
+   },
+   {
+    "t": "Ecologia",
+    "subs": [
+     "Cadeias e teias alimentares",
+     "Relações ecológicas",
+     "Ciclos biogeoquímicos",
+     "Biomas e ecossistemas brasileiros",
+     "Impactos ambientais e conservação",
+     "Populações e dinâmica populacional"
+    ]
+   },
+   {
+    "t": "Fisiologia humana",
+    "subs": [
+     "Sistema digestório e nutrição",
+     "Sistema respiratório e circulatório",
+     "Sistema excretor",
+     "Sistema nervoso e sentidos",
+     "Sistema endócrino e hormônios",
+     "Sistema imunológico, vacinas e soros",
+     "Reprodução humana e métodos contraceptivos",
+     "Sistema muscular e esquelético"
+    ]
+   },
+   {
+    "t": "Saúde e doenças",
+    "subs": [
+     "Doenças causadas por vírus",
+     "Doenças causadas por bactérias",
+     "Doenças causadas por protozoários e vermes",
+     "Saúde, prevenção e saneamento"
+    ]
+   },
+   {
+    "t": "Seres vivos (zoologia, botânica e microbiologia)",
+    "subs": [
+     "Vírus, bactérias, protozoários e fungos",
+     "Botânica (plantas: estrutura e fisiologia)",
+     "Zoologia (animais: grupos e características)"
+    ]
+   }
+  ]
+ }
+]
