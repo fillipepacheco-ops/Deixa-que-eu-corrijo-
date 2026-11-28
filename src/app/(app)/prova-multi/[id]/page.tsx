@@ -11,7 +11,7 @@ import { ActionForm } from "@/components/ui/ActionForm";
 import { ConfirmButton } from "@/components/ui/ConfirmButton";
 import { buttonClass } from "@/components/ui/button";
 import { MultiExamFields } from "@/components/multi/MultiExamFields";
-import { InviteShare } from "@/components/multi/InviteShare";
+import { GroupInviteShare, InviteShare } from "@/components/multi/InviteShare";
 import { slotProgress, type MultiQuestion, type MultiSlot } from "@/lib/multi/build";
 import { formatDateBR } from "@/lib/assessment/header";
 
@@ -78,6 +78,26 @@ export default async function ProvaMultiDetail({ params }: { params: Promise<{ i
       <div className="grid grid-cols-[minmax(0,1fr)] gap-6 xl:grid-cols-[minmax(0,1fr)_380px]">
         <section className="space-y-4">
           <h2 className="text-[15px] font-bold text-brand-900">Professores e disciplinas (cada um é uma seção, nesta ordem)</h2>
+          {slots.length > 0 && (
+            <Card className="border-[#25D366]/40 bg-[#25D366]/5 p-4">
+              <p className="text-[15px] font-bold text-brand-900">Convite para o grupo dos professores</p>
+              <p className="mb-3 mt-0.5 text-[13px] text-muted">
+                Uma mensagem só, com o nome de todos os professores ({slots.length}) e o link de cada um. Mande no grupo: cada professor clica no link do seu nome e
+                começa a escrever as questões.
+              </p>
+              <GroupInviteShare
+                title={exam.title}
+                when={exam.applied_on ? formatDateBR(exam.applied_on) : null}
+                list={slots.map((s) => ({
+                  teacher: s.teacher_name,
+                  discipline: s.discipline,
+                  email: s.email,
+                  count: s.question_count,
+                  url: `${origin}/convite/${s.invite_code}`,
+                }))}
+              />
+            </Card>
+          )}
           {slots.length === 0 && <p className="rounded-xl border border-dashed border-brand-200 bg-brand-50/60 px-4 py-6 text-center text-[14px] text-muted">Cadastre ao lado os professores que vão mandar questões.</p>}
           {slots.map((s, i) => {
             const p = progress[i];
