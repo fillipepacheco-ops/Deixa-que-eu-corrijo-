@@ -1,12 +1,13 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { ArrowLeft, Pencil, Trash2 } from "lucide-react";
+import { ArrowLeft, Trash2 } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { loadSchools } from "@/services/school-context";
 import { deleteClass, updateClass } from "@/services/classes";
 import { addStudent, addStudentsBulk, removeAllStudents, removeStudent, updateStudent } from "@/services/students";
 import { StudentListField } from "@/components/students/StudentListField";
+import { StudentRow } from "@/components/students/StudentRow";
 import { Card, EmptyState, PageHeader } from "@/components/ui/PageHeader";
 import { ActionForm } from "@/components/ui/ActionForm";
 import { ConfirmButton } from "@/components/ui/ConfirmButton";
@@ -69,31 +70,8 @@ export default async function TurmaPage({ params }: { params: Promise<{ id: stri
           ) : (
             <ul className="divide-y divide-line">
               {students.map((s) => (
-                <li key={s.id} className="px-5 py-3">
-                  <details className="group">
-                    <summary className="flex cursor-pointer list-none items-center gap-3">
-                      <span className="w-8 shrink-0 text-right text-[13px] font-bold tabular-nums text-muted">
-                        {s.roll_number ?? "—"}
-                      </span>
-                      <span className="min-w-0 flex-1 truncate font-medium">{s.name}</span>
-                      {s.registration && <span className="hidden text-[12px] text-muted sm:inline">Mat. {s.registration}</span>}
-                      <Pencil size={15} className="text-muted group-open:text-brand-700" />
-                    </summary>
-                    <div className="mt-3 rounded-lg bg-brand-50/60 p-4">
-                      <ActionForm action={updateStudent.bind(null, s.id, id)} submitLabel="Salvar" successText="Salvo.">
-                        <div className="grid gap-3 sm:grid-cols-[80px_1fr_140px]">
-                          <input className="field" name="roll_number" type="number" inputMode="numeric" placeholder="Nº" defaultValue={s.roll_number ?? ""} aria-label="Nº de chamada" />
-                          <input className="field" name="name" defaultValue={s.name} aria-label="Nome" required />
-                          <input className="field" name="registration" placeholder="Matrícula" defaultValue={s.registration ?? ""} aria-label="Matrícula" />
-                        </div>
-                      </ActionForm>
-                      <div className="mt-2 flex justify-end">
-                        <ConfirmButton action={removeStudent.bind(null, s.id, id)} message={`Remover ${s.name} da turma?`} className="px-2! py-1! text-[13px]">
-                          <Trash2 size={14} /> Remover aluno
-                        </ConfirmButton>
-                      </div>
-                    </div>
-                  </details>
+                <li key={s.id}>
+                  <StudentRow student={s} save={updateStudent.bind(null, s.id, id)} remove={removeStudent.bind(null, s.id, id)} />
                 </li>
               ))}
             </ul>
