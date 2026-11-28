@@ -6,6 +6,7 @@ import { createClient } from "@/lib/supabase/server";
 import { loadSchools } from "@/services/school-context";
 import { deleteClass, updateClass } from "@/services/classes";
 import { addStudent, addStudentsBulk, removeStudent, updateStudent } from "@/services/students";
+import { StudentListField } from "@/components/students/StudentListField";
 import { Card, EmptyState, PageHeader } from "@/components/ui/PageHeader";
 import { ActionForm } from "@/components/ui/ActionForm";
 import { ConfirmButton } from "@/components/ui/ConfirmButton";
@@ -105,12 +106,12 @@ export default async function TurmaPage({ params }: { params: Promise<{ id: stri
           </Card>
 
           <Card className="p-5">
-            <h2 className="font-bold text-brand-900">Colar lista de alunos</h2>
+            <h2 className="font-bold text-brand-900">Importar ou colar lista de alunos</h2>
             <p className="mb-3 mt-1 text-[13px] text-muted">
-              Um aluno por linha. Aceita “Nome”, “12 Nome” ou “12;Nome;Matrícula” (copie direto da planilha).
+              Escolha o arquivo da lista (Excel, CSV, Word ou PDF) ou cole os nomes, um por linha. Aceita “Nome”, “12 Nome” ou “12;Nome;Matrícula”.
             </p>
             <ActionForm action={addStudentsBulk.bind(null, id)} submitLabel="Importar lista" resetOnSuccess successText="Lista importada." submitClassName="w-full">
-              <textarea className="field min-h-36 font-mono text-[13px]" name="list" placeholder={"1 Ana Beatriz Souza\n2 João Pedro Lima\n3 Maria Clara Alves"} />
+              <StudentListField />
             </ActionForm>
           </Card>
 
